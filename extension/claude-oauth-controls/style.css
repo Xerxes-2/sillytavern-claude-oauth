@@ -37,3 +37,67 @@
 	font-family: monospace;
 	font-size: 0.85em;
 }
+
+.claude-oauth-settings .claude-oauth-accounts {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.claude-oauth-settings .claude-oauth-empty {
+	font-size: 0.9em;
+	opacity: 0.7;
+	padding: 4px 0;
+}
+
+.claude-oauth-settings .claude-oauth-account {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	padding: 6px 8px;
+	border-radius: 4px;
+	background: var(--black30a);
+}
+
+.claude-oauth-settings .claude-oauth-account.active {
+	outline: 1px solid var(--active);
+}
+
+.claude-oauth-settings .claude-oauth-account-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.claude-oauth-settings .claude-oauth-badge {
+	font-size: 0.75em;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: var(--active);
+	color: var(--black70a);
+}
+
+.claude-oauth-settings .claude-oauth-account-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.claude-oauth-settings .claude-oauth-account-actions .menu_button {
+	padding: 2px 8px;
+	font-size: 0.85em;
+}
+
+.claude-oauth-settings .claude-oauth-add {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	margin-bottom: 6px;
+}
+
+.claude-oauth-settings .claude-oauth-add input {
+	flex: 1;
+	min-width: 0;
+}
