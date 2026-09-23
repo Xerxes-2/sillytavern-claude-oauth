@@ -352,7 +352,9 @@ async function main() {
       const pendingAlice = await callRoute(router, 'GET', '/status', { user: 'alice' })
       check('other users see it as busy, not pending', pendingAlice.payload?.login?.pending === false && pendingAlice.payload.login.busy === true, JSON.stringify(pendingAlice.payload?.login))
       const aliceStart = await callRoute(router, 'POST', '/login', { body: { name: 'x' }, user: 'alice' })
-      check('other users cannot start a login meanwhile', aliceStart.statusCode === 500 && String(aliceStart.payload?.error).includes('Another Claude login'), JSON.stringify(aliceStart.payload))
+      check('other users cannot start a login meanwhile', aliceStart.statusCode === 409 && String(aliceStart.payload?.error).includes('Another Claude login'), JSON.stringify(aliceStart.payload))
+      // The UI translates by code, so the code matters as much as the status.
+      check('login conflict carries a stable error code', aliceStart.payload?.code === 'login_busy', JSON.stringify(aliceStart.payload))
       const aliceCancel = await callRoute(router, 'POST', '/login/cancel', { user: 'alice' })
       check('other users cannot cancel it', aliceCancel.statusCode !== 200 || aliceCancel.payload?.cancelled !== true, JSON.stringify(aliceCancel.payload))
 
@@ -566,6 +568,12 @@ async function main() {
     check('DELETE with an invalid account name is a 400', badDelete.statusCode === 400, `status=${badDelete.statusCode}`)
     const badVerify = await callRoute(router, 'GET', '/accounts/..%2F..%2Fetc/verify', { user: 'alice' })
     check('verify with a traversal-shaped name is a 400', badVerify.statusCode === 400, `status=${badVerify.statusCode}`)
+    check('name rejections carry a stable error code', badDelete.payload?.code === 'invalid_account_name' && badVerify.payload?.code === 'invalid_account_name', `${badDelete.payload?.code} / ${badVerify.payload?.code}`)
+
+    // The extension keys its translations off `code`; an untagged error would
+    // silently fall back to English for every locale.
+    const anonymous = await callRoute(router, 'GET', '/status', { user: null })
+    check('unauthenticated requests are tagged not_logged_in', anonymous.statusCode === 401 && anonymous.payload?.code === 'not_logged_in', JSON.stringify(anonymous.payload))
 
     // Oversized bodies must be answered (413), not silently reset.
     const realLimit = CONFIG.maxBodyBytes

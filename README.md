@@ -1,5 +1,7 @@
 # SillyTavern Claude OAuth（订阅登录）插件
 
+[English](README.en.md) · **简体中文**
+
 用 Claude Pro/Max 订阅（Claude Code 的 OAuth 通道）驱动 SillyTavern 内置的 **Claude** chat completion 来源，不需要 Anthropic API key，也不需要安装 `claude` CLI 手动跑 `setup-token`。
 
 认证部分**全部复用 `@earendil-works/pi-ai`**（Claude Code 的 client id、PKCE、token 交换、refresh、Claude Code 身份伪装头都是它现成的），本仓库只负责把它接到 SillyTavern 上。pi-ai 的 OAuth 流程以 ~15 KB 打包产物的形式随仓库分发，**所以插件运行时零依赖，装好不用 `npm install`**。
@@ -22,10 +24,14 @@ sillytavern-claude-oauth/
 │   ├── login.mjs                 # 交互式登录状态机（含手动粘贴回调 URL；按用户归属）
 │   └── proxy.mjs                 # 127.0.0.1 上的 Anthropic 透传反代（需代理密码）
 ├── vendor/anthropic-oauth.mjs    # pi-ai 的 Anthropic OAuth 流程（esbuild 打包，~15 KB，随仓库分发）
-├── scripts/build-vendor.mjs      # 重新生成 vendor/，带 --check 校验模式
+├── scripts/
+│   ├── build-vendor.mjs          # 重新生成 vendor/，带 --check 校验模式
+│   └── i18n-keys.mjs             # 提取 UI 翻译 key，带 --check 校验语言包是否漂移
 ├── manifest.json                 # 界面扩展清单（同一仓库也可作为 ST 扩展安装）
-├── extension/                    # 界面扩展：账号列表/登录/切换来源
-└── test/smoke.mjs                # 88 项端到端自检，不需要真账号、不联网、零依赖
+├── extension/
+│   ├── index.js                  # 界面扩展：账号列表/登录/切换来源（源字符串英文）
+│   └── i18n/zh-cn.json           # 简体中文语言包
+└── test/smoke.mjs                # 91 项端到端自检，不需要真账号、不联网、零依赖
 ```
 
 ## 安装
@@ -136,10 +142,10 @@ node test/smoke.mjs         # 零依赖即可跑
 
 ```bash
 pnpm install                # 只装 dev 依赖：eslint / typescript / esbuild / pi-ai
-pnpm run check              # lint + 类型检查 + vendor 新鲜度 + 自检
+pnpm run check              # lint + 类型检查 + vendor 新鲜度 + i18n 校验 + 自检
 ```
 
-覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥、请求体超限返回 413 且连接仍可复用、非法账号名返回 400、4 MB 流式响应零截断、`init()` 幂等与 `exit()` 释放端口。另外校验 vendor 打包产物与 `vendor/manifest.json` 的 SHA256 一致、导出面与 pi-ai 公开入口 `anthropicProvider().auth.oauth` 不漂移（后者在零依赖环境下自动跳过）。当前 pi-ai **0.86.1** 下 88/88 通过。
+覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥、请求体超限返回 413 且连接仍可复用、非法账号名返回 400、4 MB 流式响应零截断、`init()` 幂等与 `exit()` 释放端口。另外校验 vendor 打包产物与 `vendor/manifest.json` 的 SHA256 一致、导出面与 pi-ai 公开入口 `anthropicProvider().auth.oauth` 不漂移（后者在零依赖环境下自动跳过）。当前 pi-ai **0.86.1** 下 91/91 通过。
 
 ## 为什么 vendor（运行时依赖为什么是 0）
 
@@ -159,14 +165,31 @@ pi-ai 把 `openai`、`@aws-sdk/client-bedrock-runtime`、`@google/genai`、`prot
 | `pnpm run lint` | ESLint flat config。格式完全按预设走：`js.configs.recommended`（ESLint 10 已把格式规则移出核心）+ `@stylistic/recommended`，即 2 空格缩进、不写分号、stroustrup 花括号。风格有争议就跑 `--fix`，不手调规则 |
 | `pnpm run typecheck` | `tsc --noEmit` + `checkJs`，用现有 JSDoc 做类型检查，不编译也不转 TS |
 | `pnpm run vendor` / `pnpm run vendor:check` | 重新打包 / 校验 vendor |
-| `pnpm test` | 88 项自检 |
+| `pnpm run i18n` / `pnpm run i18n:check` | 列出 UI 需要的翻译 key / 校验语言包与错误码是否漂移 |
+| `pnpm test` | 91 项自检 |
 | `pnpm run check` | 以上全部 |
 
 类型检查只覆盖出厂代码与脚本：`extension/` 引的是 ST 内部模块（本仓库解析不到），`test/` 的 stub 刻意是松散对象，`vendor/` 是第三方产物。
 
 `style:` 这类纯格式提交记录在 `.git-blame-ignore-revs` 里。本地 clone 后跑一次 `git config blame.ignoreRevsFile .git-blame-ignore-revs`，`git blame` 就会跳过它们（GitHub 网页端自动生效）。
 
-CI（`.github/workflows/ci.yml`）跑三个 job：Node 24 上的 lint + typecheck + vendor:check；Node 20/22/24 的自检矩阵；以及一个**完全不装 node_modules** 直接跑自检的 job —— 那才是用户真实拿到的东西。
+CI（`.github/workflows/ci.yml`）跑三个 job：Node 24 上的 lint + typecheck + vendor:check + i18n:check；Node 20/22/24 的自检矩阵；以及一个**完全不装 node_modules** 直接跑自检的 job —— 那才是用户真实拿到的东西。
+
+## 界面语言（i18n）
+
+界面走 SillyTavern 自己的 i18n：**源字符串一律是英文**，用 ST 的 `t` 模板标签包起来；翻译放在 `extension/i18n/<locale>.json`，由 `manifest.json` 的 `i18n` 字段注册。ST 找不到译文会回退英文原文，所以缺翻译只是"变英文"，不会空白。
+
+目前随仓库分发 `zh-cn`（就是本插件原来的中文文案，逐句沿用）。加一种语言只要两步：
+
+```bash
+node scripts/i18n-keys.mjs > keys.txt     # 列出 UI 需要的全部 key
+# 写 extension/i18n/<locale>.json，然后在 manifest.json 的 "i18n" 里登记
+node scripts/i18n-keys.mjs --check        # 校验：不缺、不多、没有漏翻
+```
+
+服务端报错是单独一条链路：`lib/util.mjs` 的 `fail(code, message)` 给每个用户可见的错误挂一个稳定 `code`（如 `login_busy`），响应体是 `{ ok, code, error }`。扩展按 `code` 查译文，查不到就显示服务端的英文 `message` —— 所以**日志永远是英文**（方便搜索），界面永远是用户的语言。
+
+`i18n:check` 在 CI 里是硬门槛，它同时校验三件事：语言包没有缺 key、没有已经从源码删掉的死 key、没有"翻译等于原文"的漏翻；以及服务端每个 `fail()` 错误码在扩展里都有对应译文（改名或新增错误码而忘了加翻译，会直接红）。
 
 ## 已知限制
 
@@ -174,6 +197,7 @@ CI（`.github/workflows/ci.yml`）跑三个 job：Node 24 上的 lint + typechec
 - **回调端口写死 53692**（只有监听地址能用 `PI_OAUTH_CALLBACK_HOST` 改），所以 Docker/远程场景必须用粘贴 URL 的方式，或者把 53692 映射出来。
 - **不要用 pi-ai 的 anthropic provider 转发请求**：它会把 pi 的 `Context` 重新序列化成 Anthropic 参数，而 SillyTavern 发过来的本来就是 Anthropic 原生格式，来回转换会丢 stop sequences / thinking / tools 细节。本插件只用它的 OAuth 模块。
 - 运行时要求 Node ≥ 20.6（`import.meta.resolve` 只在构建脚本里用到；pi-ai 官方自己要求 Node ≥ 22.19，但 vendor 出来的 OAuth 流程只用到 `node:http` / `node:crypto` / `fetch`）。
+- 语言包目前只有 `zh-cn`，其他语言回退到英文源字符串（欢迎 PR）。
 - SillyTavern 的 Claude 模型下拉框是硬编码的；新模型出来需要等 ST 更新，或扩展里自己注入选项。
 
 ## 排错
@@ -195,5 +219,5 @@ CI（`.github/workflows/ci.yml`）跑三个 job：Node 24 上的 lint + typechec
 
 Anthropic 在每个 `/messages` 响应上都带 `anthropic-ratelimit-unified-<桶>-utilization` / `-reset` 头（5h、7d、额外用量，以及 Opus / Sonnet / Fable 等按模型的周桶）。反代把最近一次的值记在内存里（不落盘），`/status` 里每个账号带 `usage`，扩展面板显示成「5小时 34% · 7天 61%」，≥80% 变黄，被限流（`status: rejected`）变红并显示是哪个桶、多久重置。
 
-不额外发请求、不碰未公开的 `/api/oauth/usage`（它的 429 极为激进）。按模型桶的头名 Anthropic 没有文档且改过，插件收集所有 `-utilization` 头；面板对已知桶名给中文标签（`5h`、`7d`、`7d_oi` = Fable 周额度），未知的按原名显示——看到原名请开 issue 告诉我。
+不额外发请求、不碰未公开的 `/api/oauth/usage`（它的 429 极为激进）。按模型桶的头名 Anthropic 没有文档且改过，插件收集所有 `-utilization` 头；面板对已知桶名给本地化标签（`5h`、`7d`、`7d_oi` = Fable 周额度），未知的按原名显示——看到原名请开 issue 告诉我。
 

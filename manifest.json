@@ -1,13 +1,16 @@
 {
-	"display_name": "Claude OAuth (Subscription)",
-	"loading_order": 100,
-	"requires": [],
-	"optional": [],
-	"dependencies": [],
-	"js": "extension/index.js",
-	"css": "extension/style.css",
-	"author": "Xerxes-2",
-	"version": "0.1.0",
-	"homePage": "https://github.com/Xerxes-2/sillytavern-claude-oauth",
-	"auto_update": false
+  "display_name": "Claude OAuth (Subscription)",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "js": "extension/index.js",
+  "css": "extension/style.css",
+  "author": "Xerxes-2",
+  "version": "0.1.0",
+  "homePage": "https://github.com/Xerxes-2/sillytavern-claude-oauth",
+  "auto_update": false,
+  "i18n": {
+    "zh-cn": "extension/i18n/zh-cn.json"
+  }
 }

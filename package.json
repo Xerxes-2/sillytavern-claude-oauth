@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "vendor": "node scripts/build-vendor.mjs",
     "vendor:check": "node scripts/build-vendor.mjs --check",
-    "check": "eslint . && tsc --noEmit && node scripts/build-vendor.mjs --check && node test/smoke.mjs"
+    "check": "eslint . && tsc --noEmit && node scripts/build-vendor.mjs --check && node scripts/i18n-keys.mjs --check && node test/smoke.mjs",
+    "i18n": "node scripts/i18n-keys.mjs",
+    "i18n:check": "node scripts/i18n-keys.mjs --check"
   },
   "packageManager": "pnpm@12.3.4",
   "//": "No runtime dependencies on purpose: the Claude OAuth flow is vendored into vendor/ by scripts/build-vendor.mjs. Everything below is dev-only.",

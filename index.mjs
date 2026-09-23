@@ -3,7 +3,7 @@ import { createAnthropicOAuth } from './lib/pi-oauth.mjs'
 import { createAccountRegistry, validateAccountName } from './lib/accounts.mjs'
 import { createLoginManager } from './lib/login.mjs'
 import { buildUpstreamHeaders, startProxyServer } from './lib/proxy.mjs'
-import { readJsonBody, sendJson } from './lib/util.mjs'
+import { fail, readJsonBody, sendJson } from './lib/util.mjs'
 
 export const info = {
   id: 'claude-oauth',
@@ -32,7 +32,7 @@ let startup = null
 /** Routes are only reachable after init(), but a stale router would 503 instead of TypeError. */
 function services() {
   if (!running) {
-    throw Object.assign(new Error('Claude OAuth plugin is not initialised.'), { statusCode: 503 })
+    throw fail('not_initialised', 'Claude OAuth plugin is not initialised.', 503)
   }
   return running
 }
@@ -49,7 +49,7 @@ function log(message) {
 function userHandle(request) {
   const handle = request.user?.profile?.handle
   if (typeof handle !== 'string' || !handle) {
-    throw Object.assign(new Error('Not logged in to SillyTavern.'), { statusCode: 401 })
+    throw fail('not_logged_in', 'Not logged in to SillyTavern.', 401)
   }
   return handle
 }
@@ -63,21 +63,9 @@ async function guard(response, handler) {
     if (statusCode >= 500) {
       log(`Request failed: ${error.message}`)
     }
-    sendJson(response, statusCode, { ok: false, error: error.message })
-  }
-}
-
-function badRequest(message) {
-  return Object.assign(new Error(message), { statusCode: 400 })
-}
-
-/** `validateAccountName` throws a plain Error; every route wants that as a 400, not a 500. */
-function parseAccountName(value) {
-  try {
-    return validateAccountName(value)
-  }
-  catch (error) {
-    throw badRequest(error.message)
+    // `code` lets the extension show a translated message; `error` stays
+    // English so it is still readable when a code has no translation.
+    sendJson(response, statusCode, { ok: false, code: error.code, error: error.message })
   }
 }
 
@@ -132,7 +120,7 @@ function registerRoutes(router) {
     const { login } = services()
     const handle = userHandle(request)
     const body = await readJsonBody(request)
-    const name = parseAccountName(body.name)
+    const name = validateAccountName(body.name)
     const result = await login.start({ owner: handle, name })
     sendJson(response, 200, { ok: true, ...result })
   }))
@@ -152,7 +140,7 @@ function registerRoutes(router) {
   router.delete('/accounts/:name', async (request, response) => guard(response, async () => {
     const { accounts, login } = services()
     const handle = userHandle(request)
-    const name = parseAccountName(request.params?.name)
+    const name = validateAccountName(request.params?.name)
     const pending = login.status(handle)
     if (pending.pending && pending.name === name) {
       login.cancel(handle)
@@ -165,7 +153,7 @@ function registerRoutes(router) {
   router.get('/accounts/:name/verify', async (request, response) => guard(response, async () => {
     const { accounts } = services()
     const handle = userHandle(request)
-    const name = parseAccountName(request.params?.name)
+    const name = validateAccountName(request.params?.name)
     const account = await accounts.get(handle, name)
     if (!account) {
       sendJson(response, 404, { ok: false, error: `No account named "${name}".` })

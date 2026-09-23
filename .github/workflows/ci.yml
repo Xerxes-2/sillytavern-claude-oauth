@@ -23,6 +23,8 @@ jobs:
       # The vendored OAuth bundle must still match the pinned pi-ai, byte for
       # byte. This is what catches an upstream reshuffle of the internal path.
       - run: pnpm run vendor:check
+      # Locale files and server error codes drift silently; catch it here.
+      - run: pnpm run i18n:check
 
   # The plugin runs inside whatever Node the user's SillyTavern uses.
   test:
