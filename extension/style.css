@@ -19,6 +19,17 @@
 	color: var(--error, #d05050);
 }
 
+/*
+ * ST's .menu_button is a flex item that is allowed to shrink; in the narrow
+ * extensions drawer this squeezes CJK labels (no break opportunities) into one
+ * character per line. Keep buttons at content width and let rows wrap instead.
+ */
+.claude-oauth-settings .menu_button {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	width: auto;
+}
+
 .claude-oauth-settings .claude-oauth-buttons {
 	display: flex;
 	flex-wrap: wrap;
@@ -82,6 +93,7 @@
 
 .claude-oauth-settings .claude-oauth-account-actions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 4px;
 }
 
@@ -92,12 +104,13 @@
 
 .claude-oauth-settings .claude-oauth-add {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 6px;
 	align-items: center;
 	margin-bottom: 6px;
 }
 
 .claude-oauth-settings .claude-oauth-add input {
-	flex: 1;
+	flex: 1 1 8em;
 	min-width: 0;
 }
