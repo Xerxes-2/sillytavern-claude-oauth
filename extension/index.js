@@ -6,10 +6,10 @@
  * accounts, drives the login handoff and wires SillyTavern's Claude source to
  * the plugin's loopback reverse proxy via ST's own proxy presets.
  */
-import { extension_settings } from '../../../extensions.js';
-import { getRequestHeaders } from '../../../../script.js';
-import { oai_settings } from '../../../openai.js';
-import { Popup } from '../../../popup.js';
+import { extension_settings } from '../../../../extensions.js';
+import { getRequestHeaders } from '../../../../../script.js';
+import { oai_settings } from '../../../../openai.js';
+import { Popup } from '../../../../popup.js';
 
 const PLUGIN_ID = 'claude-oauth';
 const PLUGIN_API = `/api/plugins/${PLUGIN_ID}`;

@@ -21,7 +21,8 @@ sillytavern-claude-oauth/
 │   ├── accounts.mjs              # 每用户多账号：落盘、按代理密码查找、单飞（single-flight）刷新
 │   ├── login.mjs                 # 交互式登录状态机（含手动粘贴回调 URL；按用户归属）
 │   └── proxy.mjs                 # 127.0.0.1 上的 Anthropic 透传反代（需代理密码）
-├── extension/claude-oauth-controls/   # 可选的界面扩展（账号列表/登录/切换来源）
+├── manifest.json                 # 界面扩展清单（同一仓库也可作为 ST 扩展安装）
+├── extension/                    # 界面扩展：账号列表/登录/切换来源
 └── test/smoke.mjs                # 70 项端到端自检，不需要真账号、不联网
 ```
 
@@ -52,11 +53,9 @@ enableServerPlugins: true
 
 ### 2. 界面扩展（可选，但强烈建议）
 
-```bash
-cp -r extension/claude-oauth-controls /path/to/SillyTavern/data/default-user/extensions/
-```
+在 SillyTavern 的「扩展」→「安装扩展」里粘贴仓库地址（`https://github.com/Xerxes-2/sillytavern-claude-oauth`），装成全局或当前用户均可。同一仓库根目录的 `manifest.json` 就是扩展清单。
 
-重启后在「扩展」面板里能看到 **Claude OAuth（订阅登录）**。
+装好后在「扩展」面板里能看到 **Claude OAuth（订阅登录）**。注意：界面扩展只是面板，**服务端插件仍然要按第 1 步单独安装**，否则面板会提示无法连接插件。
 
 ## 使用
 
