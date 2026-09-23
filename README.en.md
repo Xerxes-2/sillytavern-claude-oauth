@@ -219,4 +219,6 @@ Server-side errors are a separate path: `fail(code, message)` in `lib/util.mjs` 
 
 Anthropic attaches `anthropic-ratelimit-unified-<bucket>-utilization` / `-reset` headers to every `/messages` response (5h, 7d, overage, plus per-model weekly buckets such as Opus / Sonnet / Fable). The proxy keeps the most recent values in memory (never on disk), `/status` reports `usage` per account, and the panel shows it as "5 hours 34% · 7 days 61%" — yellow at ≥80%, red when rate limited (`status: rejected`), with which bucket and when it resets.
 
+Hovering a quota chip shows the full bucket name, the exact percentage, the countdown to its reset and the local clock time of that reset (e.g. "today 21:30").
+
 No extra requests are made, and the undocumented `/api/oauth/usage` endpoint is left alone (its 429s are brutal). Anthropic does not document the per-model bucket header names and has changed them, so the plugin collects every `-utilization` header; the panel gives localized labels to the buckets it knows (`5h`, `7d`, `7d_oi` = the Fable week) and shows unknown ones under their raw name — please open an issue if you see one.

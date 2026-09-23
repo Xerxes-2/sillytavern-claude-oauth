@@ -145,12 +145,43 @@ const CLAIM_LABELS = {
   overage: () => t`Overage`,
 }
 
+/**
+ * Wall-clock time of a reset, so "resets in 7 h" can be checked against a
+ * calendar without doing the arithmetic. Dates and times use the browser's
+ * locale: `t` translates wording, never number formats.
+ */
+function formatResetClock(resetsAt) {
+  const date = new Date(resetsAt)
+  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const midnight = new Date()
+  midnight.setHours(0, 0, 0, 0)
+  const days = Math.floor((date.getTime() - midnight.getTime()) / 86400000)
+  if (days === 0) return t`today ${time}`
+  if (days === 1) return t`tomorrow ${time}`
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * Hover text for a chip. The chip itself only has room for a rounded
+ * percentage, so the tooltip carries what a user actually wants when the
+ * number looks bad: which bucket this is, the exact fill, and when it frees up
+ * (both as a countdown and as a clock time). Buckets with no `-reset` header
+ * get the first two lines only.
+ */
+function usageTooltip(bucket, window) {
+  const label = BUCKET_LABELS[bucket]?.() ?? bucket
+  const exact = (window.utilization * 100).toFixed(1).replace(/\.0$/, '')
+  const lines = [label === bucket ? bucket : `${label} (${bucket})`, t`Used ${exact}%`]
+  if (window.resetsAt) lines.push(formatReset(window.resetsAt), formatResetClock(window.resetsAt))
+  return lines.join('\n')
+}
+
 /** One quota chip, coloured by how close the bucket is to full. */
 function usageChip(bucket, window) {
   const pct = Math.round(window.utilization * 100)
   const kind = pct >= 100 ? 'error' : pct >= 80 ? 'warn' : 'ok'
   const label = BUCKET_LABELS[bucket]?.() ?? bucket
-  return `<span class="claude-oauth-usage" data-kind="${kind}" title="${escapeHtml(`${bucket}: ${formatReset(window.resetsAt)}`)}">${escapeHtml(label)} ${pct}%</span>`
+  return `<span class="claude-oauth-usage" data-kind="${kind}" title="${escapeHtml(usageTooltip(bucket, window))}">${escapeHtml(label)} ${pct}%</span>`
 }
 
 /** Quota line for an account; empty until the account has served a request since restart. */
