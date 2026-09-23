@@ -1,31 +1,31 @@
 {
-	// Type-checking only: the plugin ships as plain ESM JavaScript and is never
-	// compiled. `checkJs` turns the existing JSDoc into real verification.
-	//
-	// Scope is the shipped server code plus tooling. Excluded on purpose:
-	//   extension/ 	 imports ST internals (`../../../../../script.js`) that only
-	//              	 exist inside an ST checkout, so nothing resolves here.
-	//   test/      	 stubs Anthropic, routers and fetch with deliberately loose
-	//              	 ad-hoc objects; the smoke run is the behavioural check.
-	//   vendor/    	 generated third-party output (carries its own @ts-nocheck).
-	"compilerOptions": {
-		"target": "es2022",
-		"lib": ["es2023"],
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
-		"types": ["node"],
-		"allowJs": true,
-		"checkJs": true,
-		"noEmit": true,
-		"strict": true,
-		"noImplicitAny": false,
-		// Every catch here handles errors we threw ourselves or Node/fetch errors,
-		// and reads `.message`. Narrowing each one adds noise, not safety.
-		"useUnknownInCatchVariables": false,
-		"noUncheckedIndexedAccess": false,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true
-	},
-	"include": ["index.mjs", "lib/**/*.mjs", "scripts/**/*.mjs"],
-	"exclude": ["node_modules", "vendor", "extension", "test"]
+  // Type-checking only: the plugin ships as plain ESM JavaScript and is never
+  // compiled. `checkJs` turns the existing JSDoc into real verification.
+  //
+  // Scope is the shipped server code plus tooling. Excluded on purpose:
+  //   extension/ 	 imports ST internals (`../../../../../script.js`) that only
+  //              	 exist inside an ST checkout, so nothing resolves here.
+  //   test/      	 stubs Anthropic, routers and fetch with deliberately loose
+  //              	 ad-hoc objects; the smoke run is the behavioural check.
+  //   vendor/    	 generated third-party output (carries its own @ts-nocheck).
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    // Every catch here handles errors we threw ourselves or Node/fetch errors,
+    // and reads `.message`. Narrowing each one adds noise, not safety.
+    "useUnknownInCatchVariables": false,
+    "noUncheckedIndexedAccess": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["index.mjs", "lib/**/*.mjs", "scripts/**/*.mjs"],
+  "exclude": ["node_modules", "vendor", "extension", "test"]
 }

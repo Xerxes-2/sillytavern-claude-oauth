@@ -156,7 +156,7 @@ pi-ai 把 `openai`、`@aws-sdk/client-bedrock-runtime`、`@google/genai`、`prot
 
 | 命令 | 作用 |
 |---|---|
-| `pnpm run lint` | ESLint flat config；风格规则走 @stylistic（ESLint 10 已移除核心格式规则） |
+| `pnpm run lint` | ESLint flat config。格式完全按预设走：`js.configs.recommended`（ESLint 10 已把格式规则移出核心）+ `@stylistic/recommended`，即 2 空格缩进、不写分号、stroustrup 花括号。风格有争议就跑 `--fix`，不手调规则 |
 | `pnpm run typecheck` | `tsc --noEmit` + `checkJs`，用现有 JSDoc 做类型检查，不编译也不转 TS |
 | `pnpm run vendor` / `pnpm run vendor:check` | 重新打包 / 校验 vendor |
 | `pnpm test` | 88 项自检 |
