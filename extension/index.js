@@ -70,6 +70,64 @@ function describeAccount(account) {
 	return minutes > 0 ? `已登录，token ${minutes} 分钟后刷新` : '已登录，token 待刷新';
 }
 
+function formatReset(resetsAt) {
+	if (!resetsAt) return '';
+	const minutes = Math.max(0, Math.round((resetsAt - Date.now()) / 60000));
+	if (minutes < 60) return `${minutes} 分钟后重置`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 48) return `${hours} 小时 ${minutes % 60} 分后重置`;
+	return `${Math.round(hours / 24)} 天后重置`;
+}
+
+/**
+ * Friendly labels for the quota buckets Anthropic reports. Anything not listed
+ * (per-model weekly buckets whose header names are undocumented) is shown
+ * under its raw name so it is still visible.
+ */
+const BUCKET_LABELS = {
+	'5h': '5小时',
+	'7d': '7天',
+	'overage': '额外用量',
+	'7d-opus': 'Opus周',
+	'7d-sonnet': 'Sonnet周',
+	'7d-overage-included': 'Fable周',
+};
+const BUCKET_ORDER = ['5h', '7d', '7d-overage-included', '7d-opus', '7d-sonnet', 'overage'];
+const CLAIM_LABELS = {
+	five_hour: '5小时',
+	seven_day: '7天',
+	seven_day_opus: 'Opus周',
+	seven_day_sonnet: 'Sonnet周',
+	seven_day_overage_included: 'Fable周',
+	overage: '额外用量',
+};
+
+/** One quota chip, coloured by how close the bucket is to full. */
+function usageChip(bucket, window) {
+	const pct = Math.round(window.utilization * 100);
+	const kind = pct >= 100 ? 'error' : pct >= 80 ? 'warn' : 'ok';
+	const label = BUCKET_LABELS[bucket] ?? bucket;
+	return `<span class="claude-oauth-usage" data-kind="${kind}" title="${escapeHtml(`${bucket}: ${formatReset(window.resetsAt)}`)}">${escapeHtml(label)} ${pct}%</span>`;
+}
+
+/** Quota line for an account; empty until the account has served a request since restart. */
+function renderUsage(usage) {
+	if (!usage) return '<small class="claude-oauth-usage-none">额度：发送一条消息后显示</small>';
+	const names = Object.keys(usage.buckets ?? {}).sort((a, b) => {
+		const ia = BUCKET_ORDER.indexOf(a);
+		const ib = BUCKET_ORDER.indexOf(b);
+		return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+	});
+	const chips = names.map((name) => usageChip(name, usage.buckets[name]));
+	if (usage.status === 'rejected') {
+		const which = usage.limitedBy ? (CLAIM_LABELS[usage.limitedBy] ?? usage.limitedBy) : '';
+		const reset = formatReset(usage.resetsAt ?? usage.buckets?.['5h']?.resetsAt ?? usage.buckets?.['7d']?.resetsAt);
+		chips.push(`<span class="claude-oauth-usage" data-kind="error">已限流${which ? `（${escapeHtml(which)}）` : ''}${reset ? `，${escapeHtml(reset)}` : ''}</span>`);
+	}
+	const age = Math.round((Date.now() - usage.observedAt) / 60000);
+	return `<small>额度：${chips.join(' ')} <span class="claude-oauth-usage-age">${age < 1 ? '刚刚' : `${age} 分钟前`}</span></small>`;
+}
+
 function renderAccounts() {
 	const table = document.getElementById('claude_oauth_accounts');
 	if (!table || !lastStatus) return;
@@ -86,6 +144,7 @@ function renderAccounts() {
 				<div class="claude-oauth-account-info">
 					<b>${name}</b>${isActive ? ' <span class="claude-oauth-badge">当前来源</span>' : ''}
 					<small>${escapeHtml(describeAccount(account))}</small>
+					${renderUsage(account.usage)}
 				</div>
 				<div class="claude-oauth-account-actions">
 					<div class="menu_button" data-action="use" title="把 Claude 来源指向这个账号">使用</div>

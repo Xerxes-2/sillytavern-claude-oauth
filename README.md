@@ -87,7 +87,7 @@ SillyTavern 的 Claude 适配器把请求发到 `反向代理URL + '/messages'`�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/plugins/claude-oauth/status` | 当前 ST 用户的账号列表（名字、代理密码、登录状态）、登录状态、代理地址、pi-ai 版本 |
+| GET | `/api/plugins/claude-oauth/status` | 当前 ST 用户的账号列表（名字、代理密码、登录状态）、登录状态、代理地址、pi-ai 版本，以及每个账号最近一次响应带回的额度（`usage`） |
 | POST | `/api/plugins/claude-oauth/login` | `{ name }`：为该账号开始登录（已存在则重新授权、保留密码），返回 `authUrl` |
 | POST | `/api/plugins/claude-oauth/login/code` | `{ code }`：粘贴的回调 URL 或授权码 |
 | POST | `/api/plugins/claude-oauth/login/cancel` | 取消进行中的登录（等待粘贴或换 token 阶段都可取消） |
@@ -129,7 +129,7 @@ SillyTavern 的 Claude 适配器把请求发到 `反向代理URL + '/messages'`�
 npm test        # 或 node test/smoke.mjs
 ```
 
-覆盖：beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥。当前 pi-ai **0.86.1** 下 70/70 通过。
+覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥。当前 pi-ai **0.86.1** 下 70/70 通过。
 
 ## 已知限制
 
@@ -154,3 +154,10 @@ npm test        # 或 node test/smoke.mjs
 | `Claude OAuth token refresh failed: invalid_grant` | refresh token 失效（换过密码/账号被风控/并发刷新过），重新登录 |
 | 登录成功但请求 400/403 | 账号没有开启 extra usage，或该账号被限制第三方 harness |
 | `EADDRINUSE` 45277 | 换个 `CLAUDE_OAUTH_PROXY_PORT`，并同步改反向代理 URL |
+
+## 额度提示
+
+Anthropic 在每个 `/messages` 响应上都带 `anthropic-ratelimit-unified-<桶>-utilization` / `-reset` 头（5h、7d、额外用量，以及 Opus / Sonnet / Fable 等按模型的周桶）。反代把最近一次的值记在内存里（不落盘），`/status` 里每个账号带 `usage`，扩展面板显示成「5小时 34% · 7天 61%」，≥80% 变黄，被限流（`status: rejected`）变红并显示是哪个桶、多久重置。
+
+不额外发请求、不碰未公开的 `/api/oauth/usage`（它的 429 极为激进）。按模型桶的头名 Anthropic 没有文档且改过，插件收集所有 `-utilization` 头；面板对已知桶名给中文标签，未知的按原名显示——看到原名请开 issue 告诉我。
+

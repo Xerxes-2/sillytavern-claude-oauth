@@ -91,6 +91,34 @@
 	color: var(--black70a);
 }
 
+/* Quota chips: one per rate-limit bucket, coloured by fill level. */
+.claude-oauth-settings .claude-oauth-usage {
+	display: inline-block;
+	font-size: 0.85em;
+	padding: 0 5px;
+	margin-right: 2px;
+	border-radius: 3px;
+	background: var(--black30a);
+	white-space: nowrap;
+}
+
+.claude-oauth-settings .claude-oauth-usage[data-kind='ok'] {
+	color: var(--active);
+}
+
+.claude-oauth-settings .claude-oauth-usage[data-kind='warn'] {
+	color: var(--warning, #e0a030);
+}
+
+.claude-oauth-settings .claude-oauth-usage[data-kind='error'] {
+	color: var(--error, #d05050);
+}
+
+.claude-oauth-settings .claude-oauth-usage-none,
+.claude-oauth-settings .claude-oauth-usage-age {
+	opacity: 0.6;
+}
+
 .claude-oauth-settings .claude-oauth-account-actions {
 	display: flex;
 	flex-wrap: wrap;
