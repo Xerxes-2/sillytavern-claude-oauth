@@ -23,7 +23,7 @@ sillytavern-claude-oauth/
 │   └── proxy.mjs                 # 127.0.0.1 上的 Anthropic 透传反代（需代理密码）
 ├── manifest.json                 # 界面扩展清单（同一仓库也可作为 ST 扩展安装）
 ├── extension/                    # 界面扩展：账号列表/登录/切换来源
-└── test/smoke.mjs                # 70 项端到端自检，不需要真账号、不联网
+└── test/smoke.mjs                # 75 项端到端自检，不需要真账号、不联网
 ```
 
 ## 安装
@@ -129,7 +129,7 @@ SillyTavern 的 Claude 适配器把请求发到 `反向代理URL + '/messages'`�
 npm test        # 或 node test/smoke.mjs
 ```
 
-覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥。当前 pi-ai **0.86.1** 下 70/70 通过。
+覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥。当前 pi-ai **0.86.1** 下 75/75 通过。
 
 ## 已知限制
 
