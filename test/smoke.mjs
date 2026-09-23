@@ -122,7 +122,7 @@ function startEchoAnthropic() {
 			'anthropic-ratelimit-unified-5h-reset': '1800000000',
 			'anthropic-ratelimit-unified-7d-utilization': '0.61',
 			'anthropic-ratelimit-unified-7d-reset': '1800100000',
-			'anthropic-ratelimit-unified-7d-fable-utilization': '0.05',
+			'anthropic-ratelimit-unified-7d_oi-utilization': '0.05',
 			'anthropic-ratelimit-unified-status': 'allowed',
 		});
 		response.write('event: message_start\ndata: {"type":"message_start"}\n\n');
@@ -293,7 +293,7 @@ async function main() {
 
 			const usage = (await callRoute(router, 'GET', '/status')).payload.accounts.find((a) => a.name === 'main')?.usage;
 			check('usage from upstream headers lands in /status', usage?.buckets?.['5h']?.utilization === 0.34 && usage.buckets['5h'].resetsAt === 1800000000000 && usage.buckets['7d']?.utilization === 0.61 && usage.status === 'allowed', JSON.stringify(usage));
-			check('unknown per-model bucket is kept under its raw name', usage?.buckets?.['7d-fable']?.utilization === 0.05 && usage.buckets['7d-fable'].resetsAt === null, JSON.stringify(usage?.buckets));
+			check('per-model bucket (7d_oi) is kept under its raw name', usage?.buckets?.['7d_oi']?.utilization === 0.05 && usage.buckets['7d_oi'].resetsAt === null, JSON.stringify(usage?.buckets));
 			const idle = (await callRoute(router, 'GET', '/status', { user: 'alice' })).payload.accounts.find((a) => a.name === 'work');
 			check('accounts that never served a request report usage: null', idle !== undefined && idle.usage === null, JSON.stringify(idle));
 		}

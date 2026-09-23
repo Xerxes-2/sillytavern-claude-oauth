@@ -159,5 +159,5 @@ npm test        # 或 node test/smoke.mjs
 
 Anthropic 在每个 `/messages` 响应上都带 `anthropic-ratelimit-unified-<桶>-utilization` / `-reset` 头（5h、7d、额外用量，以及 Opus / Sonnet / Fable 等按模型的周桶）。反代把最近一次的值记在内存里（不落盘），`/status` 里每个账号带 `usage`，扩展面板显示成「5小时 34% · 7天 61%」，≥80% 变黄，被限流（`status: rejected`）变红并显示是哪个桶、多久重置。
 
-不额外发请求、不碰未公开的 `/api/oauth/usage`（它的 429 极为激进）。按模型桶的头名 Anthropic 没有文档且改过，插件收集所有 `-utilization` 头；面板对已知桶名给中文标签，未知的按原名显示——看到原名请开 issue 告诉我。
+不额外发请求、不碰未公开的 `/api/oauth/usage`（它的 429 极为激进）。按模型桶的头名 Anthropic 没有文档且改过，插件收集所有 `-utilization` 头；面板对已知桶名给中文标签（`5h`、`7d`、`7d_oi` = Fable 周额度），未知的按原名显示——看到原名请开 issue 告诉我。
 

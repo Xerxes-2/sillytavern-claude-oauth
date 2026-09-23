@@ -87,12 +87,12 @@ function formatReset(resetsAt) {
 const BUCKET_LABELS = {
 	'5h': '5小时',
 	'7d': '7天',
+	'7d_oi': 'Fable周', // "overage included": the Fable bucket, observed on Max
+	'7d_opus': 'Opus周',
+	'7d_sonnet': 'Sonnet周',
 	'overage': '额外用量',
-	'7d-opus': 'Opus周',
-	'7d-sonnet': 'Sonnet周',
-	'7d-overage-included': 'Fable周',
 };
-const BUCKET_ORDER = ['5h', '7d', '7d-overage-included', '7d-opus', '7d-sonnet', 'overage'];
+const BUCKET_ORDER = ['5h', '7d', '7d_oi', '7d_opus', '7d_sonnet', 'overage'];
 const CLAIM_LABELS = {
 	five_hour: '5小时',
 	seven_day: '7天',
