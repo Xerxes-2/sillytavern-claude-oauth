@@ -1,0 +1,17 @@
+{
+	"name": "sillytavern-claude-oauth",
+	"version": "0.1.0",
+	"private": true,
+	"description": "SillyTavern server plugin: Claude Pro/Max subscription login (OAuth) for the built-in Claude chat completion source.",
+	"type": "module",
+	"main": "index.mjs",
+	"scripts": {
+		"test": "node test/smoke.mjs"
+	},
+	"dependencies": {
+		"@earendil-works/pi-ai": "0.86.1"
+	},
+	"engines": {
+		"node": ">=20.6"
+	}
+}

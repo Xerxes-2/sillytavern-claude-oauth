@@ -1,0 +1,39 @@
+.claude-oauth-settings .claude-oauth-status {
+	font-size: 0.9em;
+	padding: 6px 8px;
+	margin-bottom: 8px;
+	border-radius: 4px;
+	background: var(--black30a);
+	word-break: break-all;
+}
+
+.claude-oauth-settings .claude-oauth-status[data-kind='ok'] {
+	color: var(--active);
+}
+
+.claude-oauth-settings .claude-oauth-status[data-kind='warn'] {
+	color: var(--warning, #e0a030);
+}
+
+.claude-oauth-settings .claude-oauth-status[data-kind='error'] {
+	color: var(--error, #d05050);
+}
+
+.claude-oauth-settings .claude-oauth-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.claude-oauth-settings .claude-oauth-paste {
+	margin-top: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.claude-oauth-settings .claude-oauth-paste textarea {
+	width: 100%;
+	font-family: monospace;
+	font-size: 0.85em;
+}
