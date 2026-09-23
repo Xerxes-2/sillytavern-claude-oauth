@@ -164,6 +164,8 @@ pi-ai 把 `openai`、`@aws-sdk/client-bedrock-runtime`、`@google/genai`、`prot
 
 类型检查只覆盖出厂代码与脚本：`extension/` 引的是 ST 内部模块（本仓库解析不到），`test/` 的 stub 刻意是松散对象，`vendor/` 是第三方产物。
 
+`style:` 这类纯格式提交记录在 `.git-blame-ignore-revs` 里。本地 clone 后跑一次 `git config blame.ignoreRevsFile .git-blame-ignore-revs`，`git blame` 就会跳过它们（GitHub 网页端自动生效）。
+
 CI（`.github/workflows/ci.yml`）跑三个 job：Node 24 上的 lint + typecheck + vendor:check；Node 20/22/24 的自检矩阵；以及一个**完全不装 node_modules** 直接跑自检的 job —— 那才是用户真实拿到的东西。
 
 ## 已知限制
