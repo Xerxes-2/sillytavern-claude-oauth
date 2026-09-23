@@ -6,8 +6,8 @@
 	"dependencies": [],
 	"js": "index.js",
 	"css": "style.css",
-	"author": "you",
+	"author": "Xerxes-2",
 	"version": "0.1.0",
-	"homePage": "https://github.com/your-user/sillytavern-claude-oauth",
+	"homePage": "https://github.com/Xerxes-2/sillytavern-claude-oauth",
 	"auto_update": false
 }

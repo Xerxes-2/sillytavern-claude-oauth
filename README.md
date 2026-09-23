@@ -31,7 +31,7 @@ sillytavern-claude-oauth/
 
 ```bash
 cd /path/to/SillyTavern/plugins
-git clone <this-repo> claude-oauth
+git clone https://github.com/Xerxes-2/sillytavern-claude-oauth claude-oauth
 cd claude-oauth
 npm install                 # 只装 @earendil-works/pi-ai
 ```
