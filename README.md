@@ -2,7 +2,7 @@
 
 用 Claude Pro/Max 订阅（Claude Code 的 OAuth 通道）驱动 SillyTavern 内置的 **Claude** chat completion 来源，不需要 Anthropic API key，也不需要安装 `claude` CLI 手动跑 `setup-token`。
 
-认证部分**全部复用 `@earendil-works/pi-ai`**（Claude Code 的 client id、PKCE、token 交换、refresh、Claude Code 身份伪装头都是它现成的），本仓库只负责把它接到 SillyTavern 上。
+认证部分**全部复用 `@earendil-works/pi-ai`**（Claude Code 的 client id、PKCE、token 交换、refresh、Claude Code 身份伪装头都是它现成的），本仓库只负责把它接到 SillyTavern 上。pi-ai 的 OAuth 流程以 ~15 KB 打包产物的形式随仓库分发，**所以插件运行时零依赖，装好不用 `npm install`**。
 
 支持**多账号**：每个 SillyTavern 用户可以登录任意多个 Claude 账号，各自隔离；每个账号对应一个 ST 代理预设，在 ST 的代理预设下拉里切换。
 
@@ -17,13 +17,15 @@ sillytavern-claude-oauth/
 ├── index.mjs                     # 插件入口：init(router) / exit() / info
 ├── lib/
 │   ├── config.mjs                # 端口与 upstream（全部可用环境变量覆盖）
-│   ├── pi-oauth.mjs              # 薄适配层：pi-ai 的 anthropicProvider().auth.oauth（公开入口）
+│   ├── pi-oauth.mjs              # 薄适配层：加载 vendor/ 里打包好的 pi-ai OAuth 流程
 │   ├── accounts.mjs              # 每用户多账号：落盘、按代理密码查找、单飞（single-flight）刷新
 │   ├── login.mjs                 # 交互式登录状态机（含手动粘贴回调 URL；按用户归属）
 │   └── proxy.mjs                 # 127.0.0.1 上的 Anthropic 透传反代（需代理密码）
+├── vendor/anthropic-oauth.mjs    # pi-ai 的 Anthropic OAuth 流程（esbuild 打包，~15 KB，随仓库分发）
+├── scripts/build-vendor.mjs      # 重新生成 vendor/，带 --check 校验模式
 ├── manifest.json                 # 界面扩展清单（同一仓库也可作为 ST 扩展安装）
 ├── extension/                    # 界面扩展：账号列表/登录/切换来源
-└── test/smoke.mjs                # 75 项端到端自检，不需要真账号、不联网
+└── test/smoke.mjs                # 88 项端到端自检，不需要真账号、不联网、零依赖
 ```
 
 ## 安装
@@ -33,9 +35,9 @@ sillytavern-claude-oauth/
 ```bash
 cd /path/to/SillyTavern/plugins
 git clone https://github.com/Xerxes-2/sillytavern-claude-oauth claude-oauth
-cd claude-oauth
-npm install                 # 只装 @earendil-works/pi-ai
 ```
+
+**没有第二步，不需要 `npm install`。** 本插件运行时零依赖：OAuth 流程已经以 ~15 KB 的形式打包进 `vendor/`（见下方「为什么 vendor」）。
 
 `config.yaml` 里必须打开：
 
@@ -48,7 +50,7 @@ enableServerPlugins: true
 ```text
 [claude-oauth] Claude OAuth loopback proxy listening on http://127.0.0.1:45277
 [claude-oauth] Reverse proxy URL for SillyTavern: http://127.0.0.1:45277/v1
-[claude-oauth] pi-ai 0.86.1 (/path/to/plugins/claude-oauth/node_modules/@earendil-works/pi-ai)
+[claude-oauth] pi-ai 0.86.1 (/path/to/plugins/claude-oauth/vendor/anthropic-oauth.mjs)
 ```
 
 ### 2. 界面扩展（可选，但强烈建议）
@@ -114,8 +116,9 @@ SillyTavern 的 Claude 适配器把请求发到 `反向代理URL + '/messages'`�
 | 变量 | 默认 | 用途 |
 |---|---|---|
 | `CLAUDE_OAUTH_PROXY_PORT` | `45277` | 反代端口 |
-| `CLAUDE_OAUTH_PROXY_HOST` | `127.0.0.1` | 反代监听地址 |
-| `CLAUDE_OAUTH_MAX_BODY_BYTES` | `134217728` (128 MB) | `/messages` 请求体上限 |
+| `CLAUDE_OAUTH_PROXY_HOST` | `127.0.0.1` | 反代监听地址。**改成 `0.0.0.0` 等于把你的订阅暴露给整个局域网**，此时唯一的防线就是账号密码，除非你清楚自己在做什么否则别动 |
+| `CLAUDE_OAUTH_MAX_BODY_BYTES` | `134217728` (128 MB) | `/messages` 请求体上限，超限返回 413 |
+| `CLAUDE_OAUTH_SHUTDOWN_GRACE_MS` | `2000` | 关闭时等待进行中的回复结束多久，之后强制断开连接 |
 | `CLAUDE_OAUTH_ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1` | upstream 地址（自检/网关用） |
 | `CLAUDE_OAUTH_CLI_VERSION` | `2.1.280` | 伪装成哪个 `claude-cli` 版本 |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | 等待粘贴授权码的超时 |
@@ -126,19 +129,50 @@ SillyTavern 的 Claude 适配器把请求发到 `反向代理URL + '/messages'`�
 不需要真账号、不联网（pi-ai 的 token 交换请求被本地 stub 掉），用一个假 Anthropic 端点跑真实插件代码：
 
 ```bash
-npm test        # 或 node test/smoke.mjs
+node test/smoke.mjs         # 零依赖即可跑
 ```
 
-覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥。当前 pi-ai **0.86.1** 下 75/75 通过。
+装上开发依赖后还可以跑全套检查：
+
+```bash
+pnpm install                # 只装 dev 依赖：eslint / typescript / esbuild / pi-ai
+pnpm run check              # lint + 类型检查 + vendor 新鲜度 + 自检
+```
+
+覆盖：额度头解析（含未知桶、限流原因）、beta 头合并与剥离、路径归一化、Claude Code 身份块注入（含幂等、`cache_control` 保留）、代理密码→账号解析（401、跨账号路由）、反代透传与 SSE 流、`x-api-key` 剥离、插件路由与跨用户隔离、粘贴回调 URL 的交接（含 PKCE verifier 与 state 校验、成功后建账号、重登保留密码）、每账号 refresh 单飞与轮换持久化、登录取消与互斥、请求体超限返回 413 且连接仍可复用、非法账号名返回 400、4 MB 流式响应零截断、`init()` 幂等与 `exit()` 释放端口。另外校验 vendor 打包产物与 `vendor/manifest.json` 的 SHA256 一致、导出面与 pi-ai 公开入口 `anthropicProvider().auth.oauth` 不漂移（后者在零依赖环境下自动跳过）。当前 pi-ai **0.86.1** 下 88/88 通过。
+
+## 为什么 vendor（运行时依赖为什么是 0）
+
+pi-ai 把 `openai`、`@aws-sdk/client-bedrock-runtime`、`@google/genai`、`protobufjs` 全列在 `dependencies` 里，装下来 ~85 MB，而本插件的代码路径一行都碰不到它们（实测：OAuth 流程本身完全自包含，连 `@anthropic-ai/sdk` 都不需要）。
+
+所以 `scripts/build-vendor.mjs` 用 esbuild 把 pi-ai 的 Anthropic OAuth 流程打成 `vendor/anthropic-oauth.mjs`（~15 KB，零第三方 import），随仓库分发：
+
+- **用户侧**：`git clone` 完就能用，没有 `npm install`，供应链面从 85 MB 缩到一个文件。
+- **认证逻辑仍然是 pi-ai 的**：client id、PKCE、token 交换、refresh、回调服务器都没重写，我们不自己实现协议。
+- **升级 pi-ai**：改 `package.json` 里的 pin → `pnpm install` → `pnpm run vendor` → `pnpm run check`。
+- **防漂移**：`pnpm run vendor:check` 会重新打包并与签入文件逐字节比对，同时校验 pi-ai 与 esbuild 版本；打包产物里一旦混进任何第三方包，构建直接失败。自检里还会比对 vendor 的导出面与 pi-ai 公开入口 `anthropicProvider().auth.oauth` 是否一致。
+
+## 开发
+
+| 命令 | 作用 |
+|---|---|
+| `pnpm run lint` | ESLint flat config；风格规则走 @stylistic（ESLint 10 已移除核心格式规则） |
+| `pnpm run typecheck` | `tsc --noEmit` + `checkJs`，用现有 JSDoc 做类型检查，不编译也不转 TS |
+| `pnpm run vendor` / `pnpm run vendor:check` | 重新打包 / 校验 vendor |
+| `pnpm test` | 88 项自检 |
+| `pnpm run check` | 以上全部 |
+
+类型检查只覆盖出厂代码与脚本：`extension/` 引的是 ST 内部模块（本仓库解析不到），`test/` 的 stub 刻意是松散对象，`vendor/` 是第三方产物。
+
+CI（`.github/workflows/ci.yml`）跑三个 job：Node 24 上的 lint + typecheck + vendor:check；Node 20/22/24 的自检矩阵；以及一个**完全不装 node_modules** 直接跑自检的 job —— 那才是用户真实拿到的东西。
 
 ## 已知限制
 
-- **pi-ai 入口**：走的是 pi-ai 文档化的 `anthropicProvider().auth.oauth`（`@earendil-works/pi-ai/providers/anthropic`，0.80.8 起的规范入口；`./oauth` 子路径只剩类型）。这个接口 `login({signal, notify, prompt})` / `refresh(credential, signal)` 变了插件才会坏，升级 pi-ai 后跑一次 `npm test` 即可确认。
+- **pi-ai 入口**：vendor 打的是 `dist/auth/oauth/anthropic.js`，也就是 `anthropicProvider().auth.oauth` 背后真正被 lazy load 的那个模块（见 pi-ai 的 `dist/auth/oauth/load.js`）。这是内部路径，所以 CI 里 `vendor:check` + 自检里的导出面比对是硬门槛：pi-ai 一旦挪动或改写它，构建/测试直接红，而不是等到用户登录时才炸。
 - **回调端口写死 53692**（只有监听地址能用 `PI_OAUTH_CALLBACK_HOST` 改），所以 Docker/远程场景必须用粘贴 URL 的方式，或者把 53692 映射出来。
 - **不要用 pi-ai 的 anthropic provider 转发请求**：它会把 pi 的 `Context` 重新序列化成 Anthropic 参数，而 SillyTavern 发过来的本来就是 Anthropic 原生格式，来回转换会丢 stop sequences / thinking / tools 细节。本插件只用它的 OAuth 模块。
-- pi-ai 官方要求 Node ≥ 22.19（插件自身代码在 Node 20.6+ 可跑，因为它用到了 `import.meta.resolve`）。
+- 运行时要求 Node ≥ 20.6（`import.meta.resolve` 只在构建脚本里用到；pi-ai 官方自己要求 Node ≥ 22.19，但 vendor 出来的 OAuth 流程只用到 `node:http` / `node:crypto` / `fetch`）。
 - SillyTavern 的 Claude 模型下拉框是硬编码的；新模型出来需要等 ST 更新，或扩展里自己注入选项。
-- 依赖体积：`npm install @earendil-works/pi-ai` 会一并装 aws-sdk / openai / google-genai 等（因为它在 `dependencies` 里）。想瘦身可以用 esbuild 只打 `oauth` 路径成单文件并 `--external:node:*`（本仓库未内置该流程，因为装依赖的方式最不容易出错）。
 
 ## 排错
 

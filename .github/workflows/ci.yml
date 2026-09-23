@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Lint, types and vendor freshness only need one modern Node.
+  check:
+    name: lint + typecheck + vendor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      # The vendored OAuth bundle must still match the pinned pi-ai, byte for
+      # byte. This is what catches an upstream reshuffle of the internal path.
+      - run: pnpm run vendor:check
+
+  # The plugin runs inside whatever Node the user's SillyTavern uses.
+  test:
+    name: smoke (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  # What users actually get: a clone with no node_modules at all. Guards the
+  # "zero runtime dependencies" promise — if anything starts importing a
+  # package again, this job fails while the others still pass.
+  zero-deps:
+    name: smoke without node_modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: test ! -d node_modules
+      - run: node test/smoke.mjs

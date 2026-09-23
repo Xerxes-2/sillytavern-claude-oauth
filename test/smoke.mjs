@@ -8,15 +8,21 @@
  * against platform.claude.com is stubbed locally.
  *
  * Usage: node test/smoke.mjs
- * Requires @earendil-works/pi-ai to be installed in the plugin directory.
+ * Runs with zero dependencies installed; the pi-ai parity check below is skipped
+ * unless the dev dependency is present (CI always installs it).
  */
 
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 const PROXY_PORT = Number(process.env.SMOKE_PROXY_PORT || 45991);
+
+const sleep = (ms) => new Promise((resolve) => {
+	setTimeout(resolve, ms);
+});
 
 let failures = 0;
 let checks = 0;
@@ -114,6 +120,22 @@ function startEchoAnthropic() {
 			return;
 		}
 
+		// Opt-in large stream, used to check the proxy relays bulk data intact.
+		const bigBytes = Number(seen.requests.at(-1).body?.smoke_big_response_bytes || 0);
+		if (bigBytes > 0) {
+			response.writeHead(200, { 'content-type': 'text/event-stream' });
+			const chunk = 'x'.repeat(64 * 1024);
+			for (let sent = 0; sent < bigBytes; sent += chunk.length) {
+				if (!response.write(chunk)) {
+					await new Promise((resolve) => {
+						response.once('drain', resolve);
+					});
+				}
+			}
+			response.end();
+			return;
+		}
+
 		response.writeHead(200, {
 			'content-type': 'text/event-stream',
 			'cache-control': 'no-cache',
@@ -161,7 +183,13 @@ async function postMessages(port, payload, headers = {}, urlPath = '/v1/messages
 function stubAnthropicTokenEndpoint() {
 	const original = globalThis.fetch;
 	const seen = { calls: 0 };
-	const stub = { seen, succeedNext: null, restore: () => { globalThis.fetch = original; } };
+	const stub = {
+		seen,
+		succeedNext: null,
+		restore: () => {
+			globalThis.fetch = original;
+		},
+	};
 	globalThis.fetch = async (input, init) => {
 		const url = typeof input === 'string' ? input : input?.url ?? String(input);
 		if (url.startsWith('https://platform.claude.com/v1/oauth/token')) {
@@ -232,7 +260,11 @@ async function main() {
 		check('identity not duplicated', idempotent.system.length === 2, JSON.stringify(idempotent.system));
 
 		let threw = false;
-		try { validateAccountName('../etc'); } catch { threw = true; }
+		try {
+			validateAccountName('../etc');
+		} catch {
+			threw = true;
+		}
 		check('account names are restricted to a safe charset', threw && validateAccountName(' Work_1 ') === 'Work_1');
 	}
 
@@ -305,7 +337,7 @@ async function main() {
 		console.log('\n[3] plugin routes');
 		{
 			const status = await callRoute(router, 'GET', '/status');
-			check('status reports the loaded pi-ai version and path', /^\d+\.\d+\.\d+/.test(String(status.payload?.piAi?.version)) && String(status.payload?.piAi?.path).includes('pi-ai'), JSON.stringify(status.payload?.piAi));
+			check('status reports the vendored pi-ai version and path', /^\d+\.\d+\.\d+/.test(String(status.payload?.piAi?.version)) && String(status.payload?.piAi?.path).endsWith('vendor/anthropic-oauth.mjs'), JSON.stringify(status.payload?.piAi));
 
 			const badName = await callRoute(router, 'POST', '/login', { body: { name: 'no spaces' } });
 			check('login rejects invalid account names', badName.statusCode === 400, JSON.stringify(badName.payload));
@@ -336,7 +368,11 @@ async function main() {
 			const removed = await callRoute(router, 'DELETE', '/accounts/main');
 			check('owner can delete an account', removed.payload?.ok === true, JSON.stringify(removed.payload));
 			let gone = false;
-			try { await fs.access(accountFile('default-user', 'main')); } catch { gone = true; }
+			try {
+				await fs.access(accountFile('default-user', 'main'));
+			} catch {
+				gone = true;
+			}
 			check('deleted account file is removed', gone);
 			const afterDelete = await postMessages(PROXY_PORT, payload, { 'x-api-key': 'secret-default-main' });
 			check('deleted account\'s secret stops working immediately', afterDelete.status === 401, `status=${afterDelete.status}`);
@@ -415,7 +451,7 @@ async function main() {
 			refresh: async (refreshToken) => {
 				refreshCalls++;
 				check('refresh receives the stored refresh token', refreshToken === 'sk-ant-ort01-expired');
-				await new Promise((resolve) => setTimeout(resolve, 30));
+				await sleep(30);
 				return { refresh: 'sk-ant-ort01-rotated', access: 'sk-ant-oat01-fresh', expires: Date.now() + 3600_000 };
 			},
 		});
@@ -431,16 +467,46 @@ async function main() {
 		check('rotated refresh token persisted', persisted.credentials.refresh === 'sk-ant-ort01-rotated' && persisted.secret === 'secret-bob-old', JSON.stringify(persisted));
 	}
 
-	console.log('\n[6] pi-ai public OAuth entry point + login cancellation');
+	console.log('\n[6] vendored OAuth flow + login cancellation');
 	{
 		const { createAnthropicOAuth } = await import('../lib/pi-oauth.mjs');
 		const oauth = await createAnthropicOAuth();
-		check('adapter reports pi-ai version', /^\d+\.\d+\.\d+/.test(oauth.piAiVersion), oauth.piAiVersion);
+		check('adapter reports the vendored pi-ai version', /^\d+\.\d+\.\d+/.test(oauth.piAiVersion), oauth.piAiVersion);
+		check('adapter loads the vendored bundle', oauth.piAiPath.endsWith('vendor/anthropic-oauth.mjs'), oauth.piAiPath);
 
-		// The adapter must go through Provider.auth.oauth, not a private dist path.
-		const { anthropicProvider } = await import('@earendil-works/pi-ai/providers/anthropic');
-		const pub = anthropicProvider().auth.oauth;
-		check('pi-ai exposes anthropicProvider().auth.oauth', typeof pub.login === 'function' && typeof pub.refresh === 'function' && pub.isSubscription === true);
+		// Integrity: the shipped bundle must still be what build-vendor produced.
+		const vendored = await import('../vendor/anthropic-oauth.mjs');
+		const manifest = JSON.parse(await fs.readFile(new URL('../vendor/manifest.json', import.meta.url), 'utf8'));
+		const digest = crypto.createHash('sha256')
+			.update(await fs.readFile(new URL('../vendor/anthropic-oauth.mjs', import.meta.url), 'utf8'))
+			.digest('hex');
+		check('vendor bundle matches vendor/manifest.json', digest === manifest.sha256, `${digest.slice(0, 12)} vs ${String(manifest.sha256).slice(0, 12)}`);
+		check('vendor bundle exports anthropicOAuth', typeof vendored.anthropicOAuth?.login === 'function'
+		&& typeof vendored.anthropicOAuth?.refresh === 'function'
+		&& vendored.anthropicOAuth?.isSubscription === true);
+
+		/**
+		 * The bundle is cut from an internal pi-ai path, so drift is the risk worth
+		 * testing: whatever `anthropicProvider().auth.oauth` exposes must still match
+		 * the vendored object. Skipped on zero-dependency installs.
+		 */
+		let pub = null;
+		try {
+			pub = (await import('@earendil-works/pi-ai/providers/anthropic')).anthropicProvider().auth.oauth;
+		} catch {
+			// dev dependency absent
+		}
+		if (pub) {
+			const missing = Object.keys(vendored.anthropicOAuth).filter((key) => !(key in pub));
+			check('vendor matches pi-ai anthropicProvider().auth.oauth surface',
+				missing.length === 0
+				&& pub.name === vendored.anthropicOAuth.name
+				&& pub.isSubscription === vendored.anthropicOAuth.isSubscription
+				&& typeof pub.login === 'function' && typeof pub.refresh === 'function',
+				`missing on public entry: ${missing.join(', ') || 'none'}`);
+		} else {
+			console.log('  skip pi-ai parity check (dev dependency not installed)');
+		}
 
 		const { createLoginManager } = await import('../lib/login.mjs');
 		const saved = [];
@@ -452,17 +518,89 @@ async function main() {
 		const started = await login.start({ owner: 'u', name: 'a' });
 		check('login manager gets an auth URL', String(started.authUrl).startsWith('https://claude.ai/'));
 		let rejected = false;
-		try { await login.start({ owner: 'u', name: 'b' }); } catch { rejected = true; }
+		try {
+			await login.start({ owner: 'u', name: 'b' });
+		} catch {
+			rejected = true;
+		}
 		check('same owner cannot start a login for a different account meanwhile', rejected);
 		const cancelled = login.cancel('u');
 		check('cancel reports cancelled', cancelled.cancelled === true && cancelled.name === 'a');
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await sleep(50);
 		check('cancel clears the pending login', login.status('u').pending === false, JSON.stringify(login.status('u')));
 		check('cancel does not save credentials', saved.length === 0);
 		const again = await login.start({ owner: 'u', name: 'a' });
 		check('a new login can start after cancel', Boolean(again.authUrl));
 		login.cancel('u');
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await sleep(50);
+	}
+
+	console.log('\n[7] hardening: body limit, argument validation, lifecycle');
+	{
+		const plugin = await import('../index.mjs');
+		const { CONFIG } = await import('../lib/config.mjs');
+		const router = createRouter();
+		await plugin.init(router);
+
+		// A second init() must reuse the running proxy instead of racing for the port.
+		const secondRouter = createRouter();
+		let reinitError = null;
+		try {
+			await plugin.init(secondRouter);
+		} catch (error) {
+			reinitError = error;
+		}
+		check('init() is idempotent (no EADDRINUSE)', reinitError === null, String(reinitError?.message));
+		const secondStatus = await callRoute(secondRouter, 'GET', '/status', { user: 'alice' });
+		check('routes are registered on every router passed to init()', secondStatus.statusCode === 200 && secondStatus.payload?.ok === true, JSON.stringify(secondStatus.payload).slice(0, 120));
+
+		// Invalid account names are caller errors: 400, not 500.
+		const badDelete = await callRoute(router, 'DELETE', '/accounts/not a name', { user: 'alice' });
+		check('DELETE with an invalid account name is a 400', badDelete.statusCode === 400, `status=${badDelete.statusCode}`);
+		const badVerify = await callRoute(router, 'GET', '/accounts/..%2F..%2Fetc/verify', { user: 'alice' });
+		check('verify with a traversal-shaped name is a 400', badVerify.statusCode === 400, `status=${badVerify.statusCode}`);
+
+		// Oversized bodies must be answered (413), not silently reset.
+		const realLimit = CONFIG.maxBodyBytes;
+		CONFIG.maxBodyBytes = 2048;
+		const before = echo.requests.length;
+		const oversized = await postMessages(PROXY_PORT, {
+			model: 'm',
+			max_tokens: 1,
+			messages: [{ role: 'user', content: 'y'.repeat(64 * 1024) }],
+		}, { 'x-api-key': 'secret-alice-work' });
+		check('oversized body is rejected with 413', oversized.status === 413, `status=${oversized.status} body=${oversized.text.slice(0, 120)}`);
+		check('oversized body never reaches upstream', echo.requests.length === before, `${echo.requests.length} vs ${before}`);
+		CONFIG.maxBodyBytes = realLimit;
+
+		const stillWorks = await postMessages(PROXY_PORT, { model: 'm', max_tokens: 1, messages: [] }, { 'x-api-key': 'secret-alice-work' });
+		check('the proxy keeps serving after a 413', stillWorks.status === 200, `status=${stillWorks.status}`);
+
+		// Backpressure path: a multi-megabyte stream must arrive byte-exact.
+		const bigBytes = 4 * 1024 * 1024;
+		const big = await postMessages(PROXY_PORT, {
+			model: 'm',
+			max_tokens: 1,
+			messages: [],
+			smoke_big_response_bytes: bigBytes,
+		}, { 'x-api-key': 'secret-alice-work' });
+		check('large streamed response relayed without truncation', big.status === 200 && big.text.length === bigBytes, `status=${big.status} bytes=${big.text.length}/${bigBytes}`);
+
+		await plugin.exit();
+		let refused = false;
+		try {
+			await fetch(`http://127.0.0.1:${PROXY_PORT}/health`);
+		} catch {
+			refused = true;
+		}
+		check('exit() releases the proxy port', refused);
+		let doubleExitError = null;
+		try {
+			await plugin.exit();
+		} catch (error) {
+			doubleExitError = error;
+		}
+		check('exit() is safe to call twice', doubleExitError === null, String(doubleExitError?.message));
 	}
 
 	echo.server.close();

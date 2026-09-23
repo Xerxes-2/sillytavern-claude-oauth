@@ -11,11 +11,31 @@ export const info = {
 	description: 'Claude Pro/Max OAuth login for the built-in Claude chat completion source, powered by pi-ai. Multiple accounts per SillyTavern user.',
 };
 
-let proxy = null;
-let login = null;
-let accounts = null;
+/**
+ * The running services, or null before init()/after exit(). Kept as one object
+ * so routes can never see a half-started plugin (proxy up, registry not yet).
+ *
+ * @type {{
+ *   accounts: ReturnType<typeof createAccountRegistry>,
+ *   login: ReturnType<typeof createLoginManager>,
+ *   proxy: Awaited<ReturnType<typeof startProxyServer>>,
+ * } | null}
+ */
+let running = null;
 let piAi = { version: 'unknown', path: 'unknown' };
-let started = false;
+/**
+ * In-flight or completed startup; also the "are we running?" flag.
+ * @type {Promise<void>|null}
+ */
+let startup = null;
+
+/** Routes are only reachable after init(), but a stale router would 503 instead of TypeError. */
+function services() {
+	if (!running) {
+		throw Object.assign(new Error('Claude OAuth plugin is not initialised.'), { statusCode: 503 });
+	}
+	return running;
+}
 
 function log(message) {
 	console.log(`[claude-oauth] ${message}`);
@@ -50,11 +70,20 @@ function badRequest(message) {
 	return Object.assign(new Error(message), { statusCode: 400 });
 }
 
-export async function init(router) {
+/** `validateAccountName` throws a plain Error; every route wants that as a 400, not a 500. */
+function parseAccountName(value) {
+	try {
+		return validateAccountName(value);
+	} catch (error) {
+		throw badRequest(error.message);
+	}
+}
+
+async function startServices() {
 	const oauth = await createAnthropicOAuth();
 	piAi = { version: oauth.piAiVersion, path: oauth.piAiPath };
 
-	accounts = createAccountRegistry({
+	const accounts = createAccountRegistry({
 		dataRoot: dataRoot(),
 		// pi-ai applies its own 30 s request timeout to the refresh call.
 		refresh: (refreshToken) => oauth.refresh(refreshToken),
@@ -62,20 +91,28 @@ export async function init(router) {
 	});
 	await accounts.scan();
 
-	login = createLoginManager({
+	const login = createLoginManager({
 		oauth,
 		config: CONFIG,
 		onSuccess: ({ owner, name, credentials }) => accounts.upsert(owner, name, credentials),
 		log,
 	});
 
-	proxy = await startProxyServer({
+	const proxy = await startProxyServer({
 		config: CONFIG,
 		resolveAccount: (secret) => accounts.resolveBySecret(secret),
 		log,
 	});
 
+	running = { accounts, login, proxy };
+
+	log(`Reverse proxy URL for SillyTavern: ${proxyBaseUrl()}`);
+	log(`pi-ai ${piAi.version} (${piAi.path})`);
+}
+
+function registerRoutes(router) {
 	router.get('/status', async (request, response) => guard(response, async () => {
+		const { accounts, login } = services();
 		const handle = userHandle(request);
 		const list = await accounts.list(handle);
 		sendJson(response, 200, {
@@ -90,19 +127,16 @@ export async function init(router) {
 
 	/** Start (or re-run) the login for an account. Existing accounts keep their secret. */
 	router.post('/login', async (request, response) => guard(response, async () => {
+		const { login } = services();
 		const handle = userHandle(request);
 		const body = await readJsonBody(request);
-		let name;
-		try {
-			name = validateAccountName(body.name);
-		} catch (error) {
-			throw badRequest(error.message);
-		}
+		const name = parseAccountName(body.name);
 		const result = await login.start({ owner: handle, name });
 		sendJson(response, 200, { ok: true, ...result });
 	}));
 
 	router.post('/login/code', async (request, response) => guard(response, async () => {
+		const { login } = services();
 		const handle = userHandle(request);
 		const body = await readJsonBody(request);
 		const result = await login.submitCode(handle, body.code ?? body.input ?? body.url);
@@ -110,12 +144,13 @@ export async function init(router) {
 	}));
 
 	router.post('/login/cancel', async (request, response) => guard(response, async () => {
-		sendJson(response, 200, { ok: true, ...login.cancel(userHandle(request)) });
+		sendJson(response, 200, { ok: true, ...services().login.cancel(userHandle(request)) });
 	}));
 
 	router.delete('/accounts/:name', async (request, response) => guard(response, async () => {
+		const { accounts, login } = services();
 		const handle = userHandle(request);
-		const name = validateAccountName(request.params?.name);
+		const name = parseAccountName(request.params?.name);
 		const pending = login.status(handle);
 		if (pending.pending && pending.name === name) {
 			login.cancel(handle);
@@ -126,8 +161,9 @@ export async function init(router) {
 
 	/** Cheap end-to-end check: does the stored token actually work upstream? */
 	router.get('/accounts/:name/verify', async (request, response) => guard(response, async () => {
+		const { accounts } = services();
 		const handle = userHandle(request);
-		const name = validateAccountName(request.params?.name);
+		const name = parseAccountName(request.params?.name);
 		const account = await accounts.get(handle, name);
 		if (!account) {
 			sendJson(response, 404, { ok: false, error: `No account named "${name}".` });
@@ -145,18 +181,35 @@ export async function init(router) {
 			body: text.slice(0, 500),
 		});
 	}));
+}
 
-	if (!started) {
-		started = true;
-		log(`Reverse proxy URL for SillyTavern: ${proxyBaseUrl()}`);
-		log(`pi-ai ${piAi.version} (${piAi.path})`);
+/**
+ * Idempotent: the services (proxy port, account registry, login manager) are
+ * process-wide singletons, so a second `init()` — a hot reload, or ST loading
+ * the plugin twice — must reuse them instead of racing for the proxy port.
+ * Routes are still registered on whichever router is handed in.
+ */
+export async function init(router) {
+	if (!startup) {
+		// Memoising the promise (not a boolean) also dedupes concurrent init() calls:
+		// both await the same startup instead of racing to bind the proxy port.
+		startup = startServices().catch(async (error) => {
+			startup = null;
+			await exit();
+			throw error;
+		});
 	}
+	await startup;
+	registerRoutes(router);
 }
 
 export async function exit() {
-	if (proxy) {
-		await proxy.close();
-		proxy = null;
+	const current = running;
+	running = null;
+	startup = null;
+	// Aborts a pending login (and clears its timeout) so nothing keeps the loop alive.
+	current?.login.shutdown();
+	if (current) {
+		await current.proxy.close();
 	}
-	started = false;
 }

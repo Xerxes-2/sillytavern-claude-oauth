@@ -1,0 +1,8 @@
+# pnpm asks before running dependency install scripts. Only esbuild needs one
+# (it fetches its platform binary) and it is dev-only. @google/genai and
+# protobufjs arrive as transitive pi-ai dependencies that this repo never
+# executes — nothing of theirs should run on install.
+allowBuilds:
+  esbuild: true
+  '@google/genai': false
+  protobufjs: false
