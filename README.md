@@ -126,7 +126,7 @@ SillyTavern 的 Claude 适配器把请求发到 `反向代理URL + '/messages'`�
 | `CLAUDE_OAUTH_MAX_BODY_BYTES` | `134217728` (128 MB) | `/messages` 请求体上限，超限返回 413 |
 | `CLAUDE_OAUTH_SHUTDOWN_GRACE_MS` | `2000` | 关闭时等待进行中的回复结束多久，之后强制断开连接 |
 | `CLAUDE_OAUTH_ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1` | upstream 地址（自检/网关用） |
-| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.280` | 伪装成哪个 `claude-cli` 版本 |
+| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.281` | 伪装成哪个 `claude-cli` 版本 |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | 等待粘贴授权码的超时 |
 | `PI_OAUTH_CALLBACK_HOST` | `127.0.0.1` | pi-ai 读的回调监听地址（端口 53692 写死） |
 

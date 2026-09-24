@@ -126,7 +126,7 @@ One limitation: pi-ai's callback port 53692 is process-wide, so **only one perso
 | `CLAUDE_OAUTH_MAX_BODY_BYTES` | `134217728` (128 MB) | `/messages` request body limit; over it the proxy answers 413 |
 | `CLAUDE_OAUTH_SHUTDOWN_GRACE_MS` | `2000` | How long shutdown waits for in-flight replies before forcing connections closed |
 | `CLAUDE_OAUTH_ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1` | Upstream address (used by the self-checks and by gateways) |
-| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.280` | Which `claude-cli` version to present as |
+| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.281` | Which `claude-cli` version to present as |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | How long to wait for a pasted authorization code |
 | `PI_OAUTH_CALLBACK_HOST` | `127.0.0.1` | Callback bind address read by pi-ai (the port 53692 is hard-coded) |
 
