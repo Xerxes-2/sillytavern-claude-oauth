@@ -19,7 +19,7 @@
   "//": "No runtime dependencies on purpose: the Claude OAuth flow is vendored into vendor/ by scripts/build-vendor.mjs. Everything below is dev-only.",
   "dependencies": {},
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.86.1",
+    "@earendil-works/pi-ai": "0.87.1",
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.2",
