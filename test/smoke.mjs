@@ -269,6 +269,27 @@ async function main() {
     check('account names are restricted to a safe charset', threw && validateAccountName(' Work_1 ') === 'Work_1')
   }
 
+  console.log('\n[1b] diagnostics helpers')
+  {
+    const { describeError, createLoopLagMonitor } = await import('../lib/diagnostics.mjs')
+    const timeout = Object.assign(new Error('Connect Timeout Error'), { name: 'ConnectTimeoutError', code: 'UND_ERR_CONNECT_TIMEOUT' })
+    const described = describeError(new TypeError('fetch failed', { cause: timeout }))
+    check('describeError follows the cause chain', described === 'fetch failed; cause=ConnectTimeoutError: Connect Timeout Error [UND_ERR_CONNECT_TIMEOUT]', described)
+    const aggregate = describeError(new AggregateError([Object.assign(new Error('a'), { code: 'ETIMEDOUT' }), new Error('b')], 'all failed'))
+    check('describeError lists AggregateError members', aggregate === 'all failed; error=a [ETIMEDOUT]; error=b', aggregate)
+
+    const warnings = []
+    const monitor = createLoopLagMonitor({ intervalMs: 20, warnMs: 150, log: message => warnings.push(message) })
+    const tracker = monitor.track()
+    await sleep(30)
+    const until = Date.now() + 250
+    while (Date.now() < until) { /* block the event loop */ }
+    await sleep(60)
+    tracker.done()
+    monitor.stop()
+    check('loop lag monitor records a blocked event loop', tracker.maxLagMs >= 150 && warnings.some(w => w.includes('Event loop was blocked')), `maxLag=${tracker.maxLagMs} warnings=${warnings.length}`)
+  }
+
   console.log('\n[2] proxy round trip against a stand-in Anthropic endpoint')
   {
     const plugin = await import('../index.mjs')
@@ -590,6 +611,34 @@ async function main() {
 
     const stillWorks = await postMessages(PROXY_PORT, { model: 'm', max_tokens: 1, messages: [] }, { 'x-api-key': 'secret-alice-work' })
     check('the proxy keeps serving after a 413', stillWorks.status === 200, `status=${stillWorks.status}`)
+
+    // Every proxied request logs one timing line; failures carry the cause chain.
+    const logged = []
+    const realLog = console.log
+    console.log = (...args) => {
+      logged.push(args.join(' '))
+    }
+    try {
+      await postMessages(PROXY_PORT, { model: 'timing-model', stream: true, max_tokens: 1, messages: [] }, { 'x-api-key': 'secret-alice-work' })
+      const realBase = CONFIG.anthropicBaseUrl
+      const closedPort = await new Promise((resolve) => {
+        const probe = http.createServer().listen(0, '127.0.0.1', () => {
+          const { port } = /** @type {import('node:net').AddressInfo} */ (probe.address())
+          probe.close(() => resolve(port))
+        })
+      })
+      CONFIG.anthropicBaseUrl = `http://127.0.0.1:${closedPort}/v1`
+      const unreachable = await postMessages(PROXY_PORT, { model: 'm', max_tokens: 1, messages: [] }, { 'x-api-key': 'secret-alice-work' })
+      CONFIG.anthropicBaseUrl = realBase
+      check('upstream connect failure is a 502 with the cause chain', unreachable.status === 502 && unreachable.text.includes('cause=') && unreachable.text.includes('ECONNREFUSED'), unreachable.text.slice(0, 200))
+    }
+    finally {
+      Object.assign(console, { log: realLog })
+    }
+    const okLine = logged.find(line => line.includes('model=timing-model'))
+    check('successful request logs per-stage timings', /POST \/messages \(alice\/work\): 200 after \S+ \[token \S+, body \S+ in \S+, ttfb \S+, stream \S+; model=timing-model stream=true; max loop lag \S+\]/.test(okLine ?? ''), String(okLine))
+    const failLine = logged.find(line => line.includes('failed during'))
+    check('failed request logs its stage and cause', /failed during upstream request after \S+ \[.*\]: fetch failed; cause=.*ECONNREFUSED/.test(failLine ?? ''), String(failLine))
 
     // Backpressure path: a multi-megabyte stream must arrive byte-exact.
     const bigBytes = 4 * 1024 * 1024
