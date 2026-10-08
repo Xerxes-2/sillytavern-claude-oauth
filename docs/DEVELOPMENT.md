@@ -21,7 +21,7 @@ The plugin has no runtime dependencies; `node test/smoke.mjs` also runs without 
 
 ## Self-checks
 
-`test/smoke.mjs` runs the real plugin against a fake Anthropic endpoint with pi-ai's token exchange stubbed: no account, no network. It covers header rewriting, password → account routing, streaming, cross-user isolation, the pasted-callback login, single-flight refresh, login cancellation / mutual exclusion, body limits, and `init()` / `exit()`. It also checks the vendored bundle against `vendor/manifest.json` and pi-ai's public `anthropicProvider().auth.oauth` (skipped without `node_modules`).
+`test/smoke.mjs` runs the real plugin against a fake Anthropic endpoint with pi-ai's token exchange stubbed: no account, no network. It covers header rewriting, password → account routing, streaming, cross-user isolation, the pasted-code login, single-flight refresh, login cancellation / mutual exclusion, body limits, and `init()` / `exit()`. It also checks the vendored bundle against `vendor/manifest.json` and pi-ai's public `anthropicProvider().auth.oauth` (skipped without `node_modules`).
 
 ## Routine maintenance
 

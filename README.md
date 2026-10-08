@@ -40,9 +40,7 @@ enableServerPlugins: true
 ## 使用
 
 1. 在面板里输入一个账号名（如 `main`），点 **用 Claude 订阅登录**，浏览器会打开 claude.ai 授权页。
-2. 授权后浏览器会跳到 `http://localhost:53692/callback?...`：
-   - **本机运行**：页面会直接显示成功。
-   - **Docker / 远程服务器**：这个页面打不开是正常的。把地址栏里的**完整 URL** 复制下来，粘到面板输入框，点「提交授权码」。（也可以把 53692 端口映射出来，就不用粘贴了。）
+2. 授权后 Anthropic 页面会显示一个授权码（形如 `code#state`）。复制下来粘到面板输入框，点「提交授权码」。本机、Docker、远程服务器都一样，不需要映射端口。
 3. 第一个账号登录后会自动设为 Claude 来源。之后每个账号一行，点 **使用** 切换；也可以直接在 API 设置的代理预设下拉里选 `claude-oauth/<账号名>`。
 4. 点 **验证** 确认连通，然后正常聊天。
 
@@ -69,7 +67,6 @@ enableServerPlugins: true
 | 现象 | 解决 |
 |---|---|
 | 面板提示「无法连接插件」 | `config.yaml` 没开 `enableServerPlugins: true`，或没重启 ST |
-| 授权后浏览器「无法访问 localhost:53692」 | Docker/远程的正常现象，把完整 URL 粘到面板里 |
 | 「其他用户正在登录」 | 同一时刻整个服务器只能有一个人在登录，等对方完成或超时（15 分钟） |
 | `This authentication style is incompatible with the long context beta header` | 请求没走插件：确认来源 = Claude，反向代理 = `http://127.0.0.1:45277/v1` |
 | 401 `Unknown Claude OAuth proxy password` | ST 里的密码不属于任何账号（账号被删过？），在面板里对某个账号点「使用」 |
@@ -81,7 +78,7 @@ enableServerPlugins: true
 
 ## 已知限制
 
-- 登录回调端口固定为 **53692**，同一时刻整个服务器只能有一人在登录。
+- 同一时刻整个服务器只能有一人在登录。
 - ST 的 Claude 模型下拉是写死的，新模型要等 ST 更新。
 - 界面目前只有简体中文和英文。
 - 需要 Node ≥ 20.6。
@@ -96,7 +93,6 @@ enableServerPlugins: true
 | `CLAUDE_OAUTH_PROXY_HOST` | `127.0.0.1` | 反代监听地址。**改成 `0.0.0.0` 会把你的订阅暴露给整个网络**，别动 |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | 等待粘贴授权码的超时 |
 | `CLAUDE_OAUTH_CLI_VERSION` | `2.1.281` | 伪装的 `claude-cli` 版本 |
-| `PI_OAUTH_CALLBACK_HOST` | `127.0.0.1` | 登录回调监听地址 |
 
 完整列表见 [`lib/config.mjs`](lib/config.mjs)。
 

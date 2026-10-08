@@ -1,11 +1,11 @@
 {
-  "source": "@earendil-works/pi-ai@0.87.1",
-  "piAiVersion": "0.87.1",
+  "source": "@earendil-works/pi-ai@1.0.4",
+  "piAiVersion": "1.0.4",
   "entry": "dist/auth/oauth/anthropic.js",
   "exports": [
     "anthropicOAuth"
   ],
   "esbuild": "0.28.2",
-  "bytes": 15277,
-  "sha256": "43df75b1f38317989eea2949b900adcb41842f31a87be59b67706ee7c661bf60"
+  "bytes": 18925,
+  "sha256": "26c4d37b3065b0c72b2a8cce204eb3a6a535a37c07e28bba07c6d2185c73f8d7"
 }

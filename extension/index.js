@@ -61,7 +61,7 @@ const SERVER_ERRORS = {
   login_timeout: () => t`The login timed out. Start it again.`,
   login_cancelled: () => t`The login was cancelled.`,
   no_login_in_progress: () => t`No login is in progress.`,
-  missing_code: () => t`Paste the full redirect URL (or the authorization code) first.`,
+  missing_code: () => t`Paste the authorization code shown by Anthropic first.`,
   manual_code_not_needed: () => t`Manual code entry is no longer needed.`,
   invalid_json: () => t`The plugin could not read the request.`,
 }
@@ -252,7 +252,7 @@ function renderStatus(payload) {
     showPasteBox(payload.login.authUrl, name)
   }
   else if (payload.login?.busy) {
-    parts.push(t`Another user is logging in (the callback port is exclusive)`)
+    parts.push(t`Another user is logging in (one login at a time per server)`)
   }
   setStatus(parts.join(' · '), active ? 'ok' : 'warn')
   renderAccounts()
@@ -291,7 +291,7 @@ async function login(name) {
     if (!payload.authUrl) throw new Error(t`The plugin did not return an authorization URL.`)
     window.open(payload.authUrl, '_blank')
     showPasteBox(payload.authUrl, name)
-    setStatus(t`Authorization page opened for ${name}. After logging in, paste the full URL from the address bar below.`)
+    setStatus(t`Authorization page opened for ${name}. After logging in, paste the code Anthropic shows below.`)
   }
   catch (error) {
     const why = reason(error)
@@ -313,7 +313,7 @@ async function submitCode() {
   const input = document.getElementById('claude_oauth_code_input')
   const value = String(input?.value || '').trim()
   if (!value) {
-    setStatus(t`Paste the full redirect URL (or the authorization code) first.`, 'warn')
+    setStatus(t`Paste the authorization code shown by Anthropic first.`, 'warn')
     return
   }
   try {
@@ -460,7 +460,6 @@ function onAccountAction(event) {
 function buildPanel() {
   const container = document.getElementById('extensions_settings2') || document.getElementById('extensions_settings')
   if (!container) return
-  const callbackPort = '53692'
   const html = `
     <div class="claude-oauth-settings">
       <div class="inline-drawer">
@@ -487,10 +486,10 @@ function buildPanel() {
           <div id="claude_oauth_paste_box" class="claude-oauth-paste" style="display:none">
             <small>
               ${escapeHtml(t`Logging in account`)} <b id="claude_oauth_paste_name"></b>.
-              ${escapeHtml(t`The browser will fail to reach localhost:${callbackPort} (normal on Docker or a remote server). Copy the whole URL from the address bar and paste it here. If port ${callbackPort} is mapped into the container, the callback page completes on its own and nothing needs pasting.`)}
+              ${escapeHtml(t`After authorizing, Anthropic shows an authorization code. Copy it and paste it here.`)}
             </small>
             <a id="claude_oauth_auth_link" href="#" target="_blank" rel="noopener">${escapeHtml(t`Reopen the authorization page`)}</a>
-            <textarea id="claude_oauth_code_input" rows="3" placeholder="http://localhost:53692/callback?code=...&state=..."></textarea>
+            <textarea id="claude_oauth_code_input" rows="3" placeholder="code#state"></textarea>
             <div class="claude-oauth-buttons">
               <div id="claude_oauth_submit" class="menu_button">${escapeHtml(t`Submit code`)}</div>
               <div id="claude_oauth_cancel" class="menu_button">${escapeHtml(t`Cancel login`)}</div>

@@ -109,7 +109,6 @@ function registerRoutes(router) {
       ok: true,
       piAi: { ...piAi },
       proxyUrl: proxyBaseUrl(),
-      callbackPort: 53692,
       accounts: list.map(account => account.status()),
       login: login.status(handle),
     })

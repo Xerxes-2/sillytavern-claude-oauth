@@ -18,6 +18,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+/** Where pi-ai's copy-code login sends the browser; Anthropic shows the code there. */
+const COPY_CODE_REDIRECT_URI = 'https://platform.claude.com/oauth/code/callback'
 const PROXY_PORT = Number(process.env.SMOKE_PROXY_PORT || 45991)
 
 const sleep = ms => new Promise((resolve) => {
@@ -366,7 +368,7 @@ async function main() {
 
       const loginStart = await callRoute(router, 'POST', '/login', { body: { name: 'second' } })
       check('login returns a Claude authorization URL', String(loginStart.payload?.authUrl).startsWith('https://claude.ai/oauth/authorize'), String(loginStart.payload?.authUrl).slice(0, 80))
-      check('login URL uses the Claude Code client + PKCE', String(loginStart.payload?.authUrl).includes('code_challenge=') && String(loginStart.payload?.authUrl).includes('redirect_uri=http%3A%2F%2Flocalhost%3A53692%2Fcallback'))
+      check('login URL uses PKCE and the copy-code redirect', String(loginStart.payload?.authUrl).includes('code_challenge=') && new URL(loginStart.payload.authUrl).searchParams.get('redirect_uri') === COPY_CODE_REDIRECT_URI, String(loginStart.payload?.authUrl))
 
       const pending = await callRoute(router, 'GET', '/status')
       check('login is reported as pending for its owner', pending.payload?.login?.pending === true && pending.payload.login.name === 'second', JSON.stringify(pending.payload?.login))
@@ -406,7 +408,7 @@ async function main() {
     }
   }
 
-  console.log('\n[4] pasted-redirect-URL handoff (the Docker / remote path)')
+  console.log('\n[4] pasted authorization code handoff (copy-code login)')
   {
     const plugin = await import('../index.mjs')
     const router = createRouter()
@@ -418,11 +420,10 @@ async function main() {
       check('login can be started again', String(started.payload?.authUrl).startsWith('https://claude.ai/oauth/authorize'))
       const verifier = new URL(started.payload.authUrl).searchParams.get('state')
 
-      // The pasted redirect URL must be parsed and reach pi-ai's exchange step.
-      const redirect = `http://localhost:53692/callback?code=smoke-test-not-a-real-code&state=${verifier}`
-      const submitted = await callRoute(router, 'POST', '/login/code', { body: { code: redirect } })
-      check('pasted redirect URL reaches the token exchange', submitted.payload?.ok === false && stub.seen.calls === 1, JSON.stringify(submitted.payload).slice(0, 200))
-      check('exchange used the pasted code + PKCE verifier', stub.seen.lastBody?.code === 'smoke-test-not-a-real-code' && stub.seen.lastBody?.code_verifier === verifier, JSON.stringify(stub.seen.lastBody))
+      // The `code#state` Anthropic shows must be parsed and reach pi-ai's exchange step.
+      const submitted = await callRoute(router, 'POST', '/login/code', { body: { code: `smoke-test-not-a-real-code#${verifier}` } })
+      check('pasted code#state reaches the token exchange', submitted.payload?.ok === false && stub.seen.calls === 1, JSON.stringify(submitted.payload).slice(0, 200))
+      check('exchange used the pasted code + PKCE verifier', stub.seen.lastBody?.code === 'smoke-test-not-a-real-code' && stub.seen.lastBody?.code_verifier === verifier && stub.seen.lastBody?.redirect_uri === COPY_CODE_REDIRECT_URI, JSON.stringify(stub.seen.lastBody))
       check('exchange failure is surfaced to the caller', String(submitted.payload?.error).includes('invalid_grant'), String(submitted.payload?.error).slice(0, 160))
 
       const after = await callRoute(router, 'GET', '/status')
@@ -431,14 +432,14 @@ async function main() {
 
       const again = await callRoute(router, 'POST', '/login', { body: { name: 'pasted' } })
       check('a third login can be started', Boolean(again.payload?.authUrl))
-      const bad = await callRoute(router, 'POST', '/login/code', { body: { code: 'http://localhost:53692/callback?code=x&state=not-the-verifier' } })
+      const bad = await callRoute(router, 'POST', '/login/code', { body: { code: 'x#not-the-verifier' } })
       check('state mismatch is rejected before any exchange', bad.payload?.ok === false && String(bad.payload?.error).includes('state mismatch') && stub.seen.calls === 1, JSON.stringify(bad.payload).slice(0, 160))
 
       // A successful exchange must create the account with a fresh secret.
       stub.succeedNext = { access_token: 'sk-ant-oat01-new', refresh_token: 'sk-ant-ort01-new', expires_in: 3600 }
       const third = await callRoute(router, 'POST', '/login', { body: { name: 'pasted' } })
       const verifier3 = new URL(third.payload.authUrl).searchParams.get('state')
-      const ok = await callRoute(router, 'POST', '/login/code', { body: { code: `http://localhost:53692/callback?code=good&state=${verifier3}` } })
+      const ok = await callRoute(router, 'POST', '/login/code', { body: { code: `good#${verifier3}` } })
       check('successful exchange reports the account name', ok.payload?.ok === true && ok.payload.name === 'pasted', JSON.stringify(ok.payload))
       const created = (await callRoute(router, 'GET', '/status')).payload.accounts.find(a => a.name === 'pasted')
       check('new account is listed with a generated secret', created?.loggedIn === true && typeof created.secret === 'string' && created.secret.length >= 24, JSON.stringify(created))
@@ -451,7 +452,7 @@ async function main() {
       stub.succeedNext = { access_token: 'sk-ant-oat01-newer', refresh_token: 'sk-ant-ort01-newer', expires_in: 3600 }
       const fourth = await callRoute(router, 'POST', '/login', { body: { name: 'pasted' } })
       const verifier4 = new URL(fourth.payload.authUrl).searchParams.get('state')
-      await callRoute(router, 'POST', '/login/code', { body: { code: `http://localhost:53692/callback?code=good&state=${verifier4}` } })
+      await callRoute(router, 'POST', '/login/code', { body: { code: `${COPY_CODE_REDIRECT_URI}?code=good&state=${verifier4}` } })
       const relogged = (await callRoute(router, 'GET', '/status')).payload.accounts.find(a => a.name === 'pasted')
       check('re-login keeps the account secret', relogged?.secret === created.secret, `${relogged?.secret} vs ${created.secret}`)
       await postMessages(PROXY_PORT, { model: 'm', max_tokens: 1, messages: [] }, { 'x-api-key': created.secret })

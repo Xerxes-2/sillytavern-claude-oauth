@@ -40,9 +40,7 @@ The panel is only a UI: you still need the server plugin from step 1, otherwise 
 ## Usage
 
 1. Type an account name in the panel (e.g. `main`) and press **Log in with a Claude subscription**. Your browser opens the claude.ai authorization page.
-2. After authorizing, the browser lands on `http://localhost:53692/callback?...`:
-   - **Running locally**: the page shows success on its own.
-   - **Docker / remote server**: the page failing to load is expected. Copy the **full URL** from the address bar, paste it into the panel and press "Submit code". (Or map port 53692 out and skip the paste.)
+2. After authorizing, Anthropic shows an authorization code (`code#state`). Copy it, paste it into the panel and press "Submit code". This works the same locally, in Docker and on a remote server; no port needs mapping.
 3. The first account you log in becomes the Claude source automatically. After that each account gets a row; press **Use** to switch, or pick `claude-oauth/<account>` from the proxy preset dropdown in API settings.
 4. Press **Verify** to check the connection, then chat as usual.
 
@@ -69,7 +67,6 @@ Quota only updates as you chat; the plugin never makes extra requests for it. If
 | Symptom | Fix |
 |---|---|
 | Panel says "Cannot reach the plugin" | `enableServerPlugins: true` is missing from `config.yaml`, or ST was not restarted |
-| Browser cannot reach `localhost:53692` after authorizing | Expected on Docker/remote; paste the full URL into the panel |
 | "Another user is logging in" | Only one person per server can be logging in at a time; wait for them to finish or time out (15 minutes) |
 | `This authentication style is incompatible with the long context beta header` | The request bypassed the plugin: check source = Claude, reverse proxy = `http://127.0.0.1:45277/v1` |
 | 401 `Unknown Claude OAuth proxy password` | The password in ST belongs to no account (deleted account?); press "Use" on an account in the panel |
@@ -81,7 +78,7 @@ Quota only updates as you chat; the plugin never makes extra requests for it. If
 
 ## Known limitations
 
-- The login callback port is fixed at **53692**, so only one person per server can be logging in at a time.
+- Only one person per server can be logging in at a time.
 - SillyTavern's Claude model dropdown is hard-coded; new models need an ST update.
 - The UI ships in English and Simplified Chinese only.
 - Requires Node ≥ 20.6.
@@ -96,7 +93,6 @@ You normally don't need any. If you do, set environment variables:
 | `CLAUDE_OAUTH_PROXY_HOST` | `127.0.0.1` | Proxy bind address. **`0.0.0.0` exposes your subscription to the whole network** — leave it alone |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | How long to wait for a pasted authorization code |
 | `CLAUDE_OAUTH_CLI_VERSION` | `2.1.281` | Which `claude-cli` version to present as |
-| `PI_OAUTH_CALLBACK_HOST` | `127.0.0.1` | Login callback bind address |
 
 Full list in [`lib/config.mjs`](lib/config.mjs).
 
