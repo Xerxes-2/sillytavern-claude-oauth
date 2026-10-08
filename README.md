@@ -92,7 +92,7 @@ enableServerPlugins: true
 | `CLAUDE_OAUTH_PROXY_PORT` | `45277` | 反代端口 |
 | `CLAUDE_OAUTH_PROXY_HOST` | `127.0.0.1` | 反代监听地址。**改成 `0.0.0.0` 会把你的订阅暴露给整个网络**，别动 |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | 等待粘贴授权码的超时 |
-| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.281` | 伪装的 `claude-cli` 版本 |
+| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.293` | 伪装的 `claude-cli` 版本 |
 
 完整列表见 [`lib/config.mjs`](lib/config.mjs)。
 

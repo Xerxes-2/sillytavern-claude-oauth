@@ -92,7 +92,7 @@ You normally don't need any. If you do, set environment variables:
 | `CLAUDE_OAUTH_PROXY_PORT` | `45277` | Proxy port |
 | `CLAUDE_OAUTH_PROXY_HOST` | `127.0.0.1` | Proxy bind address. **`0.0.0.0` exposes your subscription to the whole network** — leave it alone |
 | `CLAUDE_OAUTH_LOGIN_TIMEOUT_MS` | `900000` | How long to wait for a pasted authorization code |
-| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.281` | Which `claude-cli` version to present as |
+| `CLAUDE_OAUTH_CLI_VERSION` | `2.1.293` | Which `claude-cli` version to present as |
 
 Full list in [`lib/config.mjs`](lib/config.mjs).
 
