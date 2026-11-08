@@ -15,17 +15,17 @@
     "i18n": "node scripts/i18n-keys.mjs",
     "i18n:check": "node scripts/i18n-keys.mjs --check"
   },
-  "packageManager": "pnpm@12.3.4",
+  "packageManager": "pnpm@12.18.0",
   "//": "No runtime dependencies on purpose: the Claude OAuth flow is vendored into vendor/ by scripts/build-vendor.mjs. Everything below is dev-only.",
   "dependencies": {},
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.0.4",
+    "@earendil-works/pi-ai": "1.5.0",
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.6",
     "esbuild": "0.28.2",
-    "eslint": "^10.11.0",
-    "globals": "^17.12.0",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
     "typescript": "^7.0.2"
   },
   "engines": {
