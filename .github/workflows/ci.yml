@@ -11,13 +11,13 @@ jobs:
     name: lint + typecheck + vendor
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      # Installs pnpm (from packageManager), Node and runs a frozen install.
+      - uses: pnpm/setup@v3
         with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          runtime: node@24
+          cache: true
+          require-lockfile: true
       - run: pnpm run lint
       - run: pnpm run typecheck
       # The vendored OAuth bundle must still match the pinned pi-ai, byte for
@@ -35,13 +35,12 @@ jobs:
       matrix:
         node: [20, 22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
         with:
-          node-version: ${{ matrix.node }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          runtime: node@${{ matrix.node }}
+          cache: true
+          require-lockfile: true
       - run: pnpm test
 
   # What users actually get: a clone with no node_modules at all. Guards the
@@ -51,8 +50,8 @@ jobs:
     name: smoke without node_modules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - run: test ! -d node_modules
